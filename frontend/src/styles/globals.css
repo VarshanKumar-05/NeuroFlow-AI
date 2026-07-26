@@ -1,0 +1,101 @@
+@import "tailwindcss";
+@import 'leaflet/dist/leaflet.css';
+
+@theme {
+  --color-primary: #00E5FF;
+  --color-secondary: #3B82F6;
+  --color-background: #05070B;
+  --color-surface: #10192B;
+  --color-surface-hover: #1a2540;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-text: #F8FAFC;
+  --color-muted: #94A3B8;
+  --color-border: #1E293B;
+  --color-card: #0F1729;
+  --color-accent: #00E5FF;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+}
+
+.clip-triangle {
+    clip-path: polygon(100% 0, 0 0, 100% 100%);
+}
+
+/* Glassmorphism Panel */
+.glass-panel {
+    background: linear-gradient(180deg, rgba(20,30,60,0.04) 0%, rgba(255,255,255,0.02) 100%);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Custom Leaflet Map Effects */
+.leaflet-container {
+    background-color: #0F1729 !important;
+}
+
+/* Animated Glowing Road */
+.glowing-road {
+    stroke-dasharray: 20 10;
+    animation: dash-flow 2s linear infinite;
+    filter: drop-shadow(0 0 4px #2563EB);
+}
+
+@keyframes dash-flow {
+    0% {
+        stroke-dashoffset: 30;
+    }
+    100% {
+        stroke-dashoffset: 0;
+    }
+}
+
+/* Map Node Pulse */
+.map-pulse-node {
+    animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    }
+}
+
+/* Emergency Node Pulse */
+.map-pulse-emergency {
+    animation: pulse-emergency 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes pulse-emergency {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.8);
+    }
+    70% {
+        box-shadow: 0 0 0 15px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+/* Floating Animation */
+.animate-float {
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
