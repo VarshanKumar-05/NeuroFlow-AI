@@ -8,6 +8,7 @@ import asyncio
 
 class AuditLogMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
+        print(f"[EVIDENCE] AuditLogMiddleware intercepting: {request.url.path} (method: {getattr(request, 'method', 'NO_METHOD')})")
         start_time = time.time()
         
         try:

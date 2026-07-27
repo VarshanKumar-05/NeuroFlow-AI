@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Video, RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useTrafficStore } from '../../../store/trafficStore';
+import { UniversalSourceManager } from '../../../components/common/UniversalSourceManager';
 import { api } from '../../../lib/axios';
 
 export function CameraGrid() {
@@ -222,67 +223,7 @@ export function CameraGrid() {
             </div>
 
             {/* SOURCE SELECTOR FORM */}
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4">
-                <form onSubmit={handleSetSource} className="flex flex-col sm:flex-row gap-3">
-                    <select 
-                        value={sourceType}
-                        onChange={(e) => {
-                            setSourceType(e.target.value);
-                            setSourceUrl('');
-                        }}
-                        className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full sm:w-[140px] p-2"
-                    >
-                        <option value="demo">Demo Video</option>
-                        <option value="mp4">MP4 Upload</option>
-                        <option value="rtsp">RTSP Stream</option>
-                        <option value="youtube">YouTube Live</option>
-                        <option value="0">USB Webcam</option>
-                        <option value="http">IP Camera</option>
-                    </select>
-                    
-                    {sourceType === 'demo' ? (
-                        <div className="bg-white border border-slate-200 text-slate-500 text-sm rounded-lg block w-full p-2 flex items-center bg-slate-50">
-                            Built-in Demo Dataset (Dataset.mp4)
-                        </div>
-                    ) : sourceType === 'mp4' ? (
-                        <input 
-                            type="file" 
-                            accept="video/*"
-                            onChange={(e) => setSourceFile(e.target.files?.[0] || null)}
-                            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-1.5 file:mr-4 file:py-1 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                            required
-                        />
-                    ) : sourceType === '0' ? (
-                        <select
-                            value={sourceUrl}
-                            onChange={(e) => setSourceUrl(e.target.value)}
-                            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                            required
-                        >
-                            {webcams.length > 0 ? webcams.map(cam => (
-                                <option key={cam.id} value={cam.id}>{cam.name}</option>
-                            )) : <option value="">No Webcams Found</option>}
-                        </select>
-                    ) : (
-                        <input 
-                            type="text" 
-                            value={sourceUrl}
-                            onChange={(e) => setSourceUrl(e.target.value)}
-                            placeholder={sourceType === 'youtube' ? "Enter YouTube Live URL" : "Enter Source URL / Path / ID"} 
-                            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2"
-                            required
-                        />
-                    )}
-                    
-                    <button 
-                        type="submit"
-                        disabled={isConnecting}
-                        className="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center whitespace-nowrap disabled:opacity-50"
-                    >
-                        {isConnecting ? 'Setting...' : 'Set Source'}
-                    </button>
-                </form>
-            </div>
+            <UniversalSourceManager channel="dashboard" className="mb-4" />
 
             {/* CAMERA DETAILS LIST (Keep existing aesthetics) */}
             <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">

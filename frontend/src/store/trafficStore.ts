@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 export interface TrafficStats {
   totalVehicles: number;
+  activeVehicles?: number;
   totalVehiclesTrend: number;
   avgSpeed: number;
   avgSpeedTrend: number;

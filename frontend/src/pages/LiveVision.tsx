@@ -2,52 +2,14 @@ import React, { useState } from 'react';
 import { VideoPlayer } from '../features/vision/components/VideoPlayer';
 import { DetectionTable } from '../features/vision/components/DetectionTable';
 import { StatsSidebar } from '../features/vision/components/StatsSidebar';
+import { UniversalSourceManager } from '../components/common/UniversalSourceManager';
 import { Camera, Settings2 } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export default function LiveVision() {
-  const currentChannel = 'dashboard';
-
-  // Source Manager State
-  const [sourceType, setSourceType] = useState('dataset');
-  const [url, setUrl] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [statusMsg, setStatusMsg] = useState('');
-
-  const handleSetSource = async () => {
-    setIsLoading(true);
-    try {
-      if (sourceType === 'upload' && file) {
-        const formData = new FormData();
-        formData.append('file', file);
-        await axios.post(`${API_URL}/vision/upload?channel=${currentChannel}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        setStatusMsg('Applied!');
-      } else {
-        let sourceUrl = url;
-        if (sourceType === 'dataset') sourceUrl = '/app/Dataset.mp4';
-        
-        await axios.post(`${API_URL}/vision/source?channel=${currentChannel}`, {
-          type: sourceType === 'dataset' ? 'mp4' : sourceType,
-          url: sourceUrl,
-          name: `Custom ${sourceType}`,
-          id: `src-${Date.now()}`
-        });
-        setStatusMsg('Applied!');
-      }
-      setTimeout(() => setStatusMsg(''), 3000);
-    } catch (err) {
-      console.error(err);
-      setStatusMsg('Error!');
-      setTimeout(() => setStatusMsg(''), 3000);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const currentChannel = 'live_vision';
 
   return (
     <div className="p-4 md:p-6 h-[calc(100vh-4rem)] flex flex-col gap-4 animate-in fade-in duration-500 max-w-[1600px] mx-auto">
@@ -62,47 +24,8 @@ export default function LiveVision() {
           <p className="text-slate-500 text-lg mt-1 font-medium">Real-time YOLOv11 vehicle detection and tracking.</p>
         </div>
         
-        {/* Sleek Inline Source Selector */}
-        <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-          <select 
-            value={sourceType}
-            onChange={(e) => setSourceType(e.target.value)}
-            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium"
-          >
-            <option value="dataset">Demo Video</option>
-            <option value="upload">MP4 Upload</option>
-            <option value="rtsp">RTSP Stream</option>
-            <option value="youtube">YouTube Live</option>
-            <option value="webcam">USB Webcam</option>
-            <option value="ip">IP Camera</option>
-          </select>
-
-          {sourceType === 'upload' ? (
-            <input 
-              type="file" 
-              accept="video/mp4" 
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-              className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none w-64"
-            />
-          ) : (
-            <input 
-              type="text" 
-              placeholder={sourceType === 'dataset' ? 'Built-in Demo Dataset (Dataset.mp4)' : 'Enter stream URL...'}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={sourceType === 'dataset'}
-              className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none w-64 placeholder:text-slate-400 disabled:bg-slate-50"
-            />
-          )}
-
-          <button
-            onClick={handleSetSource}
-            disabled={isLoading || (sourceType === 'upload' && !file)}
-            className="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 focus:outline-none transition-colors disabled:opacity-50"
-          >
-            {isLoading ? 'Wait...' : (statusMsg || 'Set Source')}
-          </button>
-        </div>
+        {/* Universal Source Manager Component */}
+        <UniversalSourceManager channel={currentChannel} />
       </div>
 
       {/* Main Grid */}

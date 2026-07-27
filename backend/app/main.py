@@ -7,7 +7,7 @@ from app.core.redis import redis_client
 from app.api import auth_router, health_router
 from app.middleware.error_handler import custom_error_handler
 from app.middleware.audit_log import AuditLogMiddleware
-from app.services.data_simulator import simulate_traffic_data
+from app.services.telemetry import broadcast_telemetry
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -16,14 +16,23 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_PREFIX}/openapi.json"
 )
 
-if settings.CORS_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost",
+        "http://localhost:80",
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1",
+        "http://127.0.0.1:80",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174"
+    ],
+    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.add_middleware(AuditLogMiddleware)
 app.add_exception_handler(Exception, custom_error_handler)
@@ -32,23 +41,66 @@ app.add_exception_handler(Exception, custom_error_handler)
 os.makedirs("/app/evidence", exist_ok=True)
 app.mount("/evidence", StaticFiles(directory="/app/evidence"), name="evidence")
 
-from app.services.video_source import video_managers
+from app.engine.frame_manager import frame_manager
+from app.engine.core import detection_engine
 
 @app.on_event("startup")
 async def startup_event():
     await redis_client.connect()
+    
+    # Auto-create tables and seed default admin user if not present
+    try:
+        from app.core.database import engine, Base, async_session_maker
+        from app.models.role import Role
+        from app.models.user import User
+        from app.core.security import hash_password
+        from sqlalchemy import select
+        
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            
+        async with async_session_maker() as session:
+            res = await session.execute(select(User).where(User.email == "admin@neuroflow.ai"))
+            admin = res.scalar_one_or_none()
+            if not admin:
+                res_role = await session.execute(select(Role).where(Role.name == "Administrator"))
+                admin_role = res_role.scalar_one_or_none()
+                if not admin_role:
+                    admin_role = Role(name="Administrator", description="Administrator role")
+                    session.add(admin_role)
+                    await session.commit()
+                    await session.refresh(admin_role)
+                    
+                new_admin = User(
+                    name="Admin",
+                    email="admin@neuroflow.ai",
+                    password_hash=hash_password("admin123"),
+                    role_id=admin_role.id,
+                    is_active=True
+                )
+                session.add(new_admin)
+                await session.commit()
+                print("[DB_SEED] Default admin user initialized: admin@neuroflow.ai / admin123", flush=True)
+    except Exception as err:
+        print(f"[DB_SEED_ERROR] Failed to seed database: {err}", flush=True)
+
     dataset_path = r"d:/placements/Smart traffic/frontend/public/Dataset.mp4"
     
-    # Initialize all pipelines with the default dataset initially
-    for channel in ["dashboard", "incidents", "vision"]:
-        video_managers.get_manager(channel).set_source({
-            "type": "mp4",
-            "url": dataset_path,
-            "name": f"Live City Dataset ({channel.capitalize()})",
-            "id": f"cam-{channel}"
-        })
-        # Start the background loop to push stats and process vision pipeline for each channel
-        asyncio.create_task(simulate_traffic_data(channel))
+    # Initialize the single unified camera source
+    frame_manager.set_source({
+        "type": "mp4",
+        "url": dataset_path,
+        "name": "Live City Dataset (Unified)",
+        "id": "cam-unified"
+    })
+    
+    # Start the unified detection pipeline background thread
+    detection_engine.start()
+    
+    # Start mock telemetry loops for all frontend channels to preserve API
+    asyncio.create_task(broadcast_telemetry("dashboard"))
+    asyncio.create_task(broadcast_telemetry("incidents"))
+    asyncio.create_task(broadcast_telemetry("vision"))
 
 @app.on_event("shutdown")
 async def shutdown_event():

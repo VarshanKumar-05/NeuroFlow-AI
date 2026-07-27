@@ -8,8 +8,8 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
-from app.services.video_source import video_managers
-from app.ai.pipeline import VisionPipeline
+from app.engine.frame_manager import frame_manager
+from app.engine.core import detection_engine
 
 router = APIRouter(prefix="/vision", tags=["vision"])
 
@@ -19,36 +19,44 @@ class SourceConfig(BaseModel):
     name: str = "Unknown Camera"
     id: str = "cam-1"
 
-# Maintain a registry of active VisionPipelines so we don't recreate the YOLO model on every page refresh
-pipelines = {}
-
-def get_pipeline(channel: str):
-    if channel not in pipelines:
-        pipelines[channel] = VisionPipeline(channel)
-    return pipelines[channel]
-
 @router.get("/stream")
 async def video_stream(channel: str = "dashboard"):
     """
     On-Demand streaming endpoint.
-    Automatically starts reading the video source and running inference
-    only while the HTTP socket remains open. 
+    Streams from the unified singleton DetectionEngine.
+    The 'channel' parameter is kept for API compatibility, 
+    but all channels now share the same pipeline.
     """
-    pipeline = get_pipeline(channel)
     return StreamingResponse(
-        pipeline.stream_video(),
+        detection_engine.stream_video(),
         media_type="multipart/x-mixed-replace; boundary=frame"
     )
 
 @router.post("/source")
 async def set_video_source(config: SourceConfig, channel: str = "dashboard"):
+    # Handle the built-in demo dataset
+    if config.type in ["dataset", "demo"] or "Dataset.mp4" in config.url:
+        BASE_DIR = Path(__file__).resolve().parent.parent.parent
+        VIDEO_PATH = BASE_DIR / "Dataset.mp4"
+        if not VIDEO_PATH.exists():
+            VIDEO_PATH = Path("/app/Dataset.mp4")
+            
+        if not VIDEO_PATH.exists() or not os.access(VIDEO_PATH, os.R_OK):
+            return {"status": "error", "message": f"Demo video file not found at {VIDEO_PATH}"}
+            
+        config.url = str(VIDEO_PATH)
+        config.type = "mp4"
+        config.name = "Built-in Demo Video"
+
     # Handle the special accident demo dataset
-    if config.type == "accident_demo":
+    elif config.type == "accident_demo":
         BASE_DIR = Path(__file__).resolve().parent.parent.parent
         VIDEO_PATH = BASE_DIR / "datasets" / "accident" / "Dataset_annotated.mp4"
+        if not VIDEO_PATH.exists():
+            VIDEO_PATH = Path("/app/Dataset_annotated.mp4")
         
         if not VIDEO_PATH.exists() or not os.access(VIDEO_PATH, os.R_OK):
-            return {"status": "error", "message": "Dataset file not found"}
+            return {"status": "error", "message": "Accident dataset file not found"}
             
         cap = cv2.VideoCapture(str(VIDEO_PATH))
         if not cap.isOpened():
@@ -64,7 +72,7 @@ async def set_video_source(config: SourceConfig, channel: str = "dashboard"):
         config.name = "Accident Demo Dataset"
         
     try:
-        success = video_managers.get_manager(channel).set_source(config.dict())
+        success = frame_manager.set_source(config.dict())
     except Exception as e:
         logging.error(f"Streaming error traceback: {e}")
         return {"status": "error", "message": "Streaming error"}
@@ -76,14 +84,23 @@ async def set_video_source(config: SourceConfig, channel: str = "dashboard"):
 
 @router.get("/source/status")
 async def get_video_source_status(channel: str = "dashboard"):
-    return video_managers.get_manager(channel).get_status()
+    return frame_manager.get_status()
 
 @router.post("/source/reconnect")
 async def reconnect_video_source(channel: str = "dashboard"):
-    success = video_managers.get_manager(channel).force_reconnect()
-    if not success:
-        return {"status": "error", "message": "Reconnection failed."}
-    return {"status": "success", "message": "Reconnected successfully."}
+    # Reconnect using the same config
+    current_status = frame_manager.get_status()
+    if current_status.get("url"):
+        success = frame_manager.set_source({
+            "type": current_status.get("type"),
+            "url": current_status.get("url"),
+            "name": current_status.get("name"),
+            "id": current_status.get("id", "cam-1")
+        })
+        if not success:
+            return {"status": "error", "message": "Reconnection failed."}
+        return {"status": "success", "message": "Reconnected successfully."}
+    return {"status": "error", "message": "No active source to reconnect."}
 
 def save_upload_file(file, path):
     with open(path, "wb") as buffer:
@@ -100,7 +117,7 @@ async def upload_video(file: UploadFile = File(...), channel: str = "dashboard")
     if not os.path.exists(file_path):
         return {"status": "error", "message": f"File failed to save at {file_path}"}
         
-    success = video_managers.get_manager(channel).set_source({
+    success = frame_manager.set_source({
         "type": "mp4",
         "url": file_path,
         "name": file.filename,
@@ -140,3 +157,4 @@ async def get_webcams():
                 cap.release()
                 
     return available_cams
+

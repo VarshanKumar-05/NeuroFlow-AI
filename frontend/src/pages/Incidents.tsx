@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useWSStore } from '../store/wsStore';
 import { useTrafficStore } from '../store/trafficStore';
+import { UniversalSourceManager } from '../components/common/UniversalSourceManager';
 import { AlertTriangle, MapPin, Phone, Navigation, Clock, Activity, Video, ExternalLink, Calendar, CheckCircle, ShieldCheck, Database, Zap, Settings2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import axios from 'axios';
@@ -159,48 +160,8 @@ export default function Incidents() {
           <p className="text-slate-500 text-lg mt-1 font-medium">Live accident detection and automated response coordination.</p>
         </div>
         
-        {/* Sleek Inline Source Selector */}
-        <div className="flex items-center gap-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
-          <select 
-            value={sourceType}
-            onChange={(e) => setSourceType(e.target.value)}
-            className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none font-medium"
-          >
-            <option value="accident_demo">🚨 Accident Demo Dataset</option>
-            <option value="dataset">🎥 Demo Video</option>
-            <option value="upload">📁 MP4 Upload</option>
-            <option value="rtsp">📡 RTSP Stream</option>
-            <option value="youtube">▶️ YouTube Live</option>
-            <option value="webcam">📷 USB Webcam</option>
-            <option value="ip">🌐 IP Camera</option>
-          </select>
-
-          {sourceType === 'upload' ? (
-            <input 
-              type="file" 
-              accept="video/mp4" 
-              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
-              className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2 outline-none w-64"
-            />
-          ) : (
-            <input 
-              type="text" 
-              placeholder={sourceType === 'accident_demo' ? 'Built-in Accident Dataset (Dataset_annotated.mp4)' : sourceType === 'dataset' ? 'Built-in Demo Dataset (Dataset.mp4)' : 'Enter stream URL...'}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={sourceType === 'dataset' || sourceType === 'accident_demo'}
-              className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5 outline-none w-64 placeholder:text-slate-400 disabled:bg-slate-50"
-            />
-          )}
-
-          <button
-            onClick={handleSetSource}
-            disabled={isLoading || (sourceType === 'upload' && !file)}
-            className="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 focus:outline-none transition-colors disabled:opacity-50"
-          >
-            {isLoading ? 'Wait...' : (statusMsg || 'Set Source')}
-          </button>
-        </div>
+        {/* Universal Source Manager Component */}
+        <UniversalSourceManager channel="incidents" />
       </div>
 
       {activeEmergency ? (

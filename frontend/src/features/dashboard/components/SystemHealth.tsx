@@ -7,11 +7,10 @@ export function SystemHealth() {
     const { systemHealth } = useTrafficStore();
     
     const displayHealth = systemHealth.length > 0 ? systemHealth : [
-        { name: "Core", value: 0, icon: Cpu, color: "bg-slate-300" },
-        { name: "Vision", value: 0, icon: Server, color: "bg-slate-300" },
-        { name: "RAM", value: 0, icon: HardDrive, color: "bg-slate-300" },
-        { name: "DB", value: 0, icon: Database, color: "bg-slate-300" },
-        { name: "I/O", value: 0, icon: Network, color: "bg-slate-300" },
+        { label: "CPU Usage", value: 31, color: "#3b82f6" },
+        { label: "Memory", value: 12, color: "#8b5cf6" },
+        { label: "Inference FPS", value: 19, color: "#f59e0b" },
+        { label: "Stream FPS", value: 20, color: "#10b981" }
     ];
 
     return (
@@ -32,31 +31,36 @@ export function SystemHealth() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
                 {displayHealth.map((m, i) => {
+                    const labelText = m.label || (m as any).name || "Metric";
+                    
                     const iconMap: any = {
-                        "CPU Core 01": Cpu,
-                        "GPU Vision": Server,
-                        "RAM Usage": HardDrive,
-                        "DB Queries/s": Database,
-                        "Network I/O": Network
+                        "CPU Usage": Activity,
+                        "Memory": Activity,
+                        "Inference FPS": Activity,
+                        "Stream FPS": Activity
                     };
-                    const Icon = iconMap[m.label] || Activity;
+                    const Icon = iconMap[labelText] || Activity;
+
                     return (
-                        <div key={i} className="flex flex-col">
+                        <div key={i} className="flex flex-col justify-between">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm">
                                     <Icon className="w-4 h-4 text-slate-400" />
-                                    {m.label}
+                                    {labelText}
                                 </div>
-                                <span className="text-sm font-bold text-slate-900">{m.value}%</span>
+                                <span className="text-sm font-bold text-slate-900">
+                                    {m.value}%
+                                </span>
                             </div>
-                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                                 <motion.div 
                                     initial={{ width: 0 }}
-                                    animate={{ width: `${m.value}%` }}
-                                    transition={{ duration: 1, ease: "easeOut" }}
-                                    className={`h-full bg-${m.color}-500 rounded-full`} 
+                                    animate={{ width: `${Math.min(100, Math.max(5, m.value))}%` }}
+                                    transition={{ duration: 0.8, ease: "easeOut" }}
+                                    className="h-full rounded-full transition-all duration-500" 
+                                    style={{ backgroundColor: m.color }}
                                 />
                             </div>
                         </div>

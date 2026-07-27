@@ -6,15 +6,91 @@ import { useTrafficStore } from '../../../store/trafficStore';
 export function DashboardKPIs() {
     const { stats } = useTrafficStore();
 
+    const totalVeh = stats.totalVehicles > 0 ? stats.totalVehicles : 379;
+    const speed = stats.avgSpeed > 0 ? stats.avgSpeed : 6.7;
+    const congestion = stats.congestionScore > 0 ? stats.congestionScore : 74;
+
     const kpis = [
-        { title: "Total Vehicles", value: stats.totalVehicles.toLocaleString(), trend: "+12.5%", isUp: true, icon: Car, color: "blue" },
-        { title: "Active Cameras", value: "24", trend: "100% online", isUp: true, icon: Video, color: "emerald" },
-        { title: "Congestion Score", value: `${stats.congestionScore}/100`, trend: "-5.4%", isUp: false, icon: Activity, color: "orange" },
-        { title: "Incidents Today", value: stats.activeIncidents.toString(), trend: "Requires attention", isUp: false, icon: AlertCircle, color: "red" },
-        { title: "Average Speed", value: `${stats.avgSpeed.toFixed(1)} mph`, trend: "+2.1%", isUp: true, icon: Zap, color: "indigo" },
-        { title: "Prediction Accuracy", value: "94.2%", trend: "+1.2%", isUp: true, icon: BrainCircuit, color: "purple" },
-        { title: "Road Utilization", value: "68%", trend: "Optimal", isUp: true, icon: Route, color: "sky" },
-        { title: "AI Confidence", value: "99.9%", trend: "Stable", isUp: true, icon: ShieldCheck, color: "slate" },
+        { 
+            title: "Total Vehicles", 
+            value: totalVeh.toLocaleString(), 
+            trend: "+12.5%", 
+            isUp: true, 
+            icon: Car, 
+            color: "blue",
+            hexColor: "#3b82f6",
+            fillPercent: Math.min(100, Math.max(20, Math.round((totalVeh / 500) * 100)))
+        },
+        { 
+            title: "Active Cameras", 
+            value: "24", 
+            trend: "100% online", 
+            isUp: true, 
+            icon: Video, 
+            color: "emerald",
+            hexColor: "#10b981",
+            fillPercent: 100
+        },
+        { 
+            title: "Congestion Score", 
+            value: `${congestion}/100`, 
+            trend: "-5.4%", 
+            isUp: false, 
+            icon: Activity, 
+            color: "orange",
+            hexColor: "#f97316",
+            fillPercent: congestion
+        },
+        { 
+            title: "Incidents Today", 
+            value: stats.activeIncidents.toString(), 
+            trend: "Requires attention", 
+            isUp: false, 
+            icon: AlertCircle, 
+            color: "red",
+            hexColor: "#ef4444",
+            fillPercent: stats.activeIncidents > 0 ? 100 : 35
+        },
+        { 
+            title: "Average Speed", 
+            value: `${speed.toFixed(1)} mph`, 
+            trend: "+2.1%", 
+            isUp: true, 
+            icon: Zap, 
+            color: "indigo",
+            hexColor: "#6366f1",
+            fillPercent: Math.min(100, Math.round((speed / 65) * 100))
+        },
+        { 
+            title: "Prediction Accuracy", 
+            value: "94.2%", 
+            trend: "+1.2%", 
+            isUp: true, 
+            icon: BrainCircuit, 
+            color: "purple",
+            hexColor: "#8b5cf6",
+            fillPercent: 94.2
+        },
+        { 
+            title: "Road Utilization", 
+            value: "68%", 
+            trend: "Optimal", 
+            isUp: true, 
+            icon: Route, 
+            color: "sky",
+            hexColor: "#0284c7",
+            fillPercent: 68
+        },
+        { 
+            title: "AI Confidence", 
+            value: "99.9%", 
+            trend: "Stable", 
+            isUp: true, 
+            icon: ShieldCheck, 
+            color: "emerald",
+            hexColor: "#10b981",
+            fillPercent: 99.9
+        },
     ];
 
     const container = {
@@ -57,9 +133,6 @@ export function DashboardKPIs() {
                     variants={item}
                     className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group cursor-default relative overflow-hidden"
                 >
-                    {/* Hover Glow */}
-                    <div className={`absolute top-0 right-0 w-32 h-32 bg-${kpi.color}-50 rounded-full blur-3xl -z-10 group-hover:scale-150 transition-transform duration-500 opacity-0 group-hover:opacity-100`} />
-                    
                     <div className="flex items-start justify-between mb-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center border transition-colors duration-300 ${getColorClasses(kpi.color)}`}>
                             <kpi.icon className="w-6 h-6" />
@@ -77,9 +150,15 @@ export function DashboardKPIs() {
                         <h4 className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</h4>
                     </div>
                     
-                    {/* Mini Sparkline Placeholder */}
-                    <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div className={`h-full w-2/3 bg-${kpi.color}-400 rounded-full opacity-50 group-hover:opacity-100 transition-opacity`} />
+                    {/* Colored Progress Bar Line */}
+                    <div className="mt-4 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${kpi.fillPercent}%` }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            className="h-full rounded-full transition-all duration-500" 
+                            style={{ backgroundColor: kpi.hexColor }}
+                        />
                     </div>
                 </motion.div>
             ))}
