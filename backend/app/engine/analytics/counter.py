@@ -95,6 +95,14 @@ class VehicleCounter:
             
             self.recent_counted_tracks.append((track_id, cls_id, cx, cy, now))
             
+            # Trigger ANPR Vehicle Crop & OCR Database Persistence
+            try:
+                from app.engine.anpr_processor import trigger_anpr_processing
+                bbox = data.get('bbox', [cx - 50, cy - 50, cx + 50, cy + 50])
+                trigger_anpr_processing(track_id, cls_id, conf, frame_arr if 'frame_arr' in locals() else None, bbox)
+            except Exception as e:
+                pass
+
             class_names = {2: "CAR", 3: "BIKE", 5: "BUS", 7: "TRUCK"}
             cls_name = class_names.get(cls_id, f"CLASS_{cls_id}")
             

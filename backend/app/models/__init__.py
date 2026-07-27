@@ -2,6 +2,11 @@ from .role import Role
 from .user import User
 from .camera import Camera
 from .vehicle import Vehicle
+from .plate import Plate
+from .vehicle_snapshot import VehicleSnapshot
+from .plate_snapshot import PlateSnapshot
+from .vehicle_history import VehicleHistory
+from .audit_log import AuditLog
 from .detection import Detection
 from .traffic_metric import TrafficMetric
 from .incident import Incident

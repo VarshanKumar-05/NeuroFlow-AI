@@ -37,9 +37,11 @@ app.add_middleware(
 app.add_middleware(AuditLogMiddleware)
 app.add_exception_handler(Exception, custom_error_handler)
 
-# Mount evidence directory
+# Mount evidence and static snapshots directories
 os.makedirs("/app/evidence", exist_ok=True)
+os.makedirs("app/static/snapshots", exist_ok=True)
 app.mount("/evidence", StaticFiles(directory="/app/evidence"), name="evidence")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 from app.engine.frame_manager import frame_manager
 from app.engine.core import detection_engine
