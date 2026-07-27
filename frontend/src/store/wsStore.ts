@@ -64,7 +64,13 @@ export const useWSStore = create<WebSocketState & WebSocketActions>((set, get) =
           } else if (data.type === 'CAMERA_STATUS_UPDATE') {
             store.updateCameras(data.payload);
           } else if (data.type === 'SYSTEM_HEALTH_UPDATE') {
-            store.updateSystemHealth(data.payload);
+            store.updateDetailedSystemHealth(data.payload);
+          } else if (data.type === 'HARDWARE_METRICS_UPDATE') {
+            store.updateHardware(data.payload);
+          } else if (data.type === 'EVENTS_TIMELINE_UPDATE') {
+            store.updateEvents(data.payload);
+          } else if (data.type === 'AI_STATUS_UPDATE') {
+            store.updateAIStatus(data.payload);
           } else if (data.type === 'AI_PREDICTION_UPDATE') {
             store.updatePredictions(data.payload);
           } else if (data.type === 'AI_RECOMMENDATIONS_UPDATE') {

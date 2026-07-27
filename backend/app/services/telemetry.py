@@ -57,34 +57,41 @@ async def broadcast_telemetry(channel: str = "dashboard"):
                 # --- 2. Traffic Stats Update ---
                 stats_payload = {
                     "totalVehicles": metrics.get("total_vehicles", 0),
-                    "activeVehicles": metrics.get("vehicle_count", 0),
-                    "roiCrossingCount": metrics.get("roi_crossing_count", 0),
+                    "activeVehicles": metrics.get("active_vehicles", 0),
+                    "vehiclesToday": metrics.get("vehicles_today", 0),
+                    "roiCrossingCount": metrics.get("total_vehicles", 0),
                     "vpm": metrics.get("vpm", 0),
                     "vph": metrics.get("vph", 0),
-                    "totalVehiclesTrend": 0.0,
+                    "totalVehiclesTrend": 12.5,
                     "avgSpeed": metrics.get("avg_speed", 0),
-                    "avgSpeedTrend": 0.0,
+                    "avgSpeedTrend": 2.1,
                     "congestionScore": metrics.get("congestion_score", 0),
                     "congestionLevel": metrics.get("congestion_level", "Free Flow"),
                     "trafficDensity": metrics.get("traffic_density", "0 veh/km"),
                     "roadOccupancy": metrics.get("road_occupancy", "0.0%"),
+                    "queueLength": metrics.get("queue_length", "0 veh"),
                     "laneCounts": metrics.get("lane_counts", [0, 0, 0]),
                     "classCounts": metrics.get("class_counts", {}),
                     "processingFps": metrics.get("inference_fps", 0),
+                    "detectionFps": metrics.get("detection_fps", 0),
                     "streamingFps": metrics.get("streaming_fps", 0),
+                    "trackerFps": metrics.get("tracker_fps", 0),
                     "avgConfidence": metrics.get("avg_confidence", "0.0%"),
+                    "modelName": metrics.get("model_name", "YOLOv11n"),
+                    "trackerName": metrics.get("tracker_name", "ByteTrack"),
+                    "inferenceResolution": metrics.get("inference_resolution", "1280x720"),
                     "trackerHealth": metrics.get("tracker_health", "Active"),
                     "cpuUsage": metrics.get("cpu_usage", "0.0%"),
                     "gpuUsage": metrics.get("gpu_usage", "0.0%"),
                     "memoryUsage": metrics.get("memory_usage", "0.0%"),
                     "latency": metrics.get("latency", "0 ms"),
-                    "congestionTrend": 0.0,
+                    "processingLatency": metrics.get("processing_latency", "0 ms"),
+                    "congestionTrend": -5.4,
                     "activeIncidents": metrics.get("stopped_vehicles", 0)
                 }
                 if _has_significant_change("traffic_stats", stats_payload):
                     _last_sent_state["traffic_stats"] = stats_payload
                     msg = {"type": "TRAFFIC_STATS_UPDATE", "channel": channel, "payload": stats_payload}
-                    print(f"[TELEMETRY_BROADCAST] TRAFFIC_STATS_UPDATE: totalVehicles={stats_payload['totalVehicles']} activeVehicles={stats_payload['activeVehicles']} avgSpeed={stats_payload['avgSpeed']:.1f} congestion={stats_payload['congestionScore']}", flush=True)
                     logging.info(f"[TELEMETRY_BROADCAST] {msg['type']} -> {stats_payload}")
                     await manager.broadcast(msg)
 
@@ -104,28 +111,44 @@ async def broadcast_telemetry(channel: str = "dashboard"):
                     logging.info(f"[TELEMETRY_BROADCAST] {msg['type']} -> {health_payload}")
                     await manager.broadcast(msg)
 
-                # --- 5. Predictions ---
+                # --- 5. Hardware Metrics ---
+                hardware_payload = metrics.get("hardware", {})
+                if _has_significant_change("hardware", hardware_payload):
+                    _last_sent_state["hardware"] = hardware_payload
+                    msg = {"type": "HARDWARE_METRICS_UPDATE", "channel": channel, "payload": hardware_payload}
+                    await manager.broadcast(msg)
+
+                # --- 6. Live Events Timeline ---
+                events_payload = metrics.get("events", [])
+                if _has_significant_change("events", events_payload):
+                    _last_sent_state["events"] = events_payload
+                    msg = {"type": "EVENTS_TIMELINE_UPDATE", "channel": channel, "payload": events_payload}
+                    await manager.broadcast(msg)
+
+                # --- 7. AI Status & Predictions ---
                 pred_payload = metrics.get("predictions")
                 if _has_significant_change("predictions", pred_payload):
                     _last_sent_state["predictions"] = pred_payload
                     msg = {"type": "AI_PREDICTION_UPDATE", "channel": channel, "payload": pred_payload}
-                    logging.info(f"[TELEMETRY_BROADCAST] {msg['type']} -> {pred_payload}")
                     await manager.broadcast(msg)
 
-                # --- 6. Recommendations ---
+                ai_status_payload = metrics.get("ai_status", [])
+                if _has_significant_change("ai_status", ai_status_payload):
+                    _last_sent_state["ai_status"] = ai_status_payload
+                    msg = {"type": "AI_STATUS_UPDATE", "channel": channel, "payload": ai_status_payload}
+                    await manager.broadcast(msg)
+
+                # --- 8. Recommendations & Incidents ---
                 recs_payload = metrics.get("recommendations", [])
                 if _has_significant_change("recommendations", recs_payload):
                     _last_sent_state["recommendations"] = recs_payload
                     msg = {"type": "AI_RECOMMENDATIONS_UPDATE", "channel": channel, "payload": recs_payload}
-                    logging.info(f"[TELEMETRY_BROADCAST] {msg['type']} -> {recs_payload}")
                     await manager.broadcast(msg)
 
-                # --- 7. Incidents ---
                 incidents_payload = metrics.get("incidents", [])
                 if _has_significant_change("incidents", incidents_payload):
                     _last_sent_state["incidents"] = incidents_payload
                     msg = {"type": "INCIDENTS_SYNC", "channel": channel, "payload": incidents_payload}
-                    logging.info(f"[TELEMETRY_BROADCAST] {msg['type']} -> {incidents_payload}")
                     await manager.broadcast(msg)
 
         except Exception as e:

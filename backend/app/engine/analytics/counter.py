@@ -15,8 +15,9 @@ class VehicleCounter:
         # State
         self.counted_ids = set()
         self.total_unique_vehicles = 0
-        self.class_counts = {2: 0, 3: 0, 5: 0, 7: 0}
+        self.class_counts = {2: 0, 3: 0, 5: 0, 7: 0, 0: 0} # 2: Car, 3: Motorcycle, 5: Bus, 7: Truck, 0: Emergency
         self.flow_history = []
+        self.event_callback = None
         
         # De-duplication tracking: store recent counted track states to match fragmented tracks
         # Format: [ (track_id, class_id, cx, cy, timestamp) ]
@@ -136,17 +137,19 @@ class VehicleCounter:
         total = sum(self.class_counts.values())
         if total == 0:
             return [
-                {"name": "Cars", "value": 0, "color": "#00E5FF", "icon": "Car"},
-                {"name": "Bus", "value": 0, "color": "#3B82F6", "icon": "Bus"},
-                {"name": "Truck", "value": 0, "color": "#F59E0B", "icon": "Truck"},
-                {"name": "Bike", "value": 0, "color": "#10B981", "icon": "Bike"},
+                {"name": "Cars", "value": 0, "count": 0, "color": "#00E5FF", "icon": "Car"},
+                {"name": "Trucks", "value": 0, "count": 0, "color": "#F59E0B", "icon": "Truck"},
+                {"name": "Buses", "value": 0, "count": 0, "color": "#3B82F6", "icon": "Bus"},
+                {"name": "Motorcycles", "value": 0, "count": 0, "color": "#10B981", "icon": "Bike"},
+                {"name": "Emergency Vehicles", "value": 0, "count": 0, "color": "#EF4444", "icon": "Siren"},
             ]
         
         return [
-            {"name": "Cars", "value": int(self.class_counts[2]/total*100), "color": "#00E5FF", "icon": "Car"},
-            {"name": "Bus", "value": int(self.class_counts[5]/total*100), "color": "#3B82F6", "icon": "Bus"},
-            {"name": "Truck", "value": int(self.class_counts[7]/total*100), "color": "#F59E0B", "icon": "Truck"},
-            {"name": "Bike", "value": int(self.class_counts[3]/total*100), "color": "#10B981", "icon": "Bike"},
+            {"name": "Cars", "value": round((self.class_counts.get(2, 0) / total) * 100, 1), "count": self.class_counts.get(2, 0), "color": "#00E5FF", "icon": "Car"},
+            {"name": "Trucks", "value": round((self.class_counts.get(7, 0) / total) * 100, 1), "count": self.class_counts.get(7, 0), "color": "#F59E0B", "icon": "Truck"},
+            {"name": "Buses", "value": round((self.class_counts.get(5, 0) / total) * 100, 1), "count": self.class_counts.get(5, 0), "color": "#3B82F6", "icon": "Bus"},
+            {"name": "Motorcycles", "value": round((self.class_counts.get(3, 0) / total) * 100, 1), "count": self.class_counts.get(3, 0), "color": "#10B981", "icon": "Bike"},
+            {"name": "Emergency Vehicles", "value": round((self.class_counts.get(0, 0) / total) * 100, 1), "count": self.class_counts.get(0, 0), "color": "#EF4444", "icon": "Siren"},
         ]
 
 

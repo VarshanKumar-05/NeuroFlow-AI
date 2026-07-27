@@ -1,95 +1,103 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Car, Video, Activity, AlertCircle, Zap, BrainCircuit, Route, ShieldCheck, TrendingUp, TrendingDown } from 'lucide-react';
+import { Car, Activity, Zap, ShieldCheck, Gauge, Clock, BarChart3, Radio } from 'lucide-react';
 import { useTrafficStore } from '../../../store/trafficStore';
 
 export function DashboardKPIs() {
     const { stats } = useTrafficStore();
 
-    const totalVeh = stats.totalVehicles > 0 ? stats.totalVehicles : 379;
-    const speed = stats.avgSpeed > 0 ? stats.avgSpeed : 6.7;
-    const congestion = stats.congestionScore > 0 ? stats.congestionScore : 74;
+    const totalVeh = stats.totalVehicles;
+    const activeVeh = stats.activeVehicles || 0;
+    const vehToday = stats.vehiclesToday || totalVeh;
+    const vpm = stats.vpm || 0;
+    const vph = stats.vph || 0;
+    const speed = stats.avgSpeed;
+    const congestion = stats.congestionScore;
+    const detectionFps = stats.detectionFps || stats.processingFps || 0;
+    const streamingFps = stats.streamingFps || 0;
+    const latency = stats.processingLatency || stats.latency || "0 ms";
+    const confidence = stats.avgConfidence || "0.0%";
 
     const kpis = [
         { 
             title: "Total Vehicles", 
             value: totalVeh.toLocaleString(), 
-            trend: "+12.5%", 
+            trend: "Live ROI", 
             isUp: true, 
             icon: Car, 
             color: "blue",
             hexColor: "#3b82f6",
-            fillPercent: Math.min(100, Math.max(20, Math.round((totalVeh / 500) * 100)))
+            fillPercent: Math.min(100, Math.max(10, Math.round((totalVeh / 500) * 100)))
         },
         { 
-            title: "Active Cameras", 
-            value: "24", 
-            trend: "100% online", 
+            title: "Active Vehicles", 
+            value: activeVeh.toString(), 
+            trend: "On Frame", 
             isUp: true, 
-            icon: Video, 
+            icon: Radio, 
             color: "emerald",
             hexColor: "#10b981",
-            fillPercent: 100
+            fillPercent: Math.min(100, activeVeh * 10)
         },
         { 
-            title: "Congestion Score", 
-            value: `${congestion}/100`, 
-            trend: "-5.4%", 
-            isUp: false, 
+            title: "Vehicles Today", 
+            value: vehToday.toLocaleString(), 
+            trend: "Daily Total", 
+            isUp: true, 
+            icon: BarChart3, 
+            color: "indigo",
+            hexColor: "#6366f1",
+            fillPercent: 85
+        },
+        { 
+            title: "Flow Rate (VPM / VPH)", 
+            value: `${vpm} /min | ${vph} /h`, 
+            trend: "Real-time", 
+            isUp: true, 
+            icon: Zap, 
+            color: "sky",
+            hexColor: "#0284c7",
+            fillPercent: Math.min(100, vpm * 3)
+        },
+        { 
+            title: "Congestion Index", 
+            value: `${congestion}% (${stats.congestionLevel || 'Normal'})`, 
+            trend: stats.congestionLevel || "Free Flow", 
+            isUp: congestion < 60, 
             icon: Activity, 
-            color: "orange",
-            hexColor: "#f97316",
+            color: congestion > 70 ? "red" : congestion > 40 ? "orange" : "emerald",
+            hexColor: congestion > 70 ? "#ef4444" : congestion > 40 ? "#f97316" : "#10b981",
             fillPercent: congestion
         },
         { 
-            title: "Incidents Today", 
-            value: stats.activeIncidents.toString(), 
-            trend: "Requires attention", 
-            isUp: false, 
-            icon: AlertCircle, 
-            color: "red",
-            hexColor: "#ef4444",
-            fillPercent: stats.activeIncidents > 0 ? 100 : 35
-        },
-        { 
             title: "Average Speed", 
-            value: `${speed.toFixed(1)} mph`, 
-            trend: "+2.1%", 
-            isUp: true, 
-            icon: Zap, 
-            color: "indigo",
-            hexColor: "#6366f1",
-            fillPercent: Math.min(100, Math.round((speed / 65) * 100))
-        },
-        { 
-            title: "Prediction Accuracy", 
-            value: "94.2%", 
-            trend: "+1.2%", 
-            isUp: true, 
-            icon: BrainCircuit, 
+            value: `${speed.toFixed(1)} km/h`, 
+            trend: "Estimated", 
+            isUp: speed > 20, 
+            icon: Gauge, 
             color: "purple",
             hexColor: "#8b5cf6",
-            fillPercent: 94.2
+            fillPercent: Math.min(100, Math.round((speed / 80) * 100))
         },
         { 
-            title: "Road Utilization", 
-            value: "68%", 
-            trend: "Optimal", 
-            isUp: true, 
-            icon: Route, 
-            color: "sky",
-            hexColor: "#0284c7",
-            fillPercent: 68
+            title: "Pipeline FPS (Infer / Stream)", 
+            value: `${detectionFps} / ${streamingFps} FPS`, 
+            trend: "AI Engine", 
+            isUp: detectionFps >= 15, 
+            icon: Clock, 
+            color: "emerald",
+            hexColor: "#10b981",
+            fillPercent: Math.min(100, Math.round((detectionFps / 30) * 100))
         },
         { 
-            title: "AI Confidence", 
-            value: "99.9%", 
+            title: "AI Detection Conf. & Latency", 
+            value: `${confidence} | ${latency}`, 
             trend: "Stable", 
             isUp: true, 
             icon: ShieldCheck, 
             color: "emerald",
             hexColor: "#10b981",
-            fillPercent: 99.9
+            fillPercent: parseFloat(confidence) || 95
         },
     ];
 
@@ -138,16 +146,16 @@ export function DashboardKPIs() {
                             <kpi.icon className="w-6 h-6" />
                         </div>
                         <div className={`flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${
-                            kpi.isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                            kpi.isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
                         }`}>
-                            {kpi.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span className="w-2 h-2 rounded-full bg-current animate-pulse"></span>
                             {kpi.trend}
                         </div>
                     </div>
                     
                     <div>
                         <p className="text-slate-500 text-sm font-semibold mb-1">{kpi.title}</p>
-                        <h4 className="text-2xl font-black text-slate-900 tracking-tight">{kpi.value}</h4>
+                        <h4 className="text-xl font-black text-slate-900 tracking-tight">{kpi.value}</h4>
                     </div>
                     
                     {/* Colored Progress Bar Line */}

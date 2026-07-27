@@ -232,87 +232,86 @@ export function LiveCityOverview() {
                     </MapContainer>
                 </div>
 
-                {/* Status Panel (Right Side - 32%) */}
+                {/* Status Panel (Right Side - 32%) - Section 2 Traffic Status */}
                 <div className="flex-1 shrink-0 relative overflow-hidden rounded-2xl glass-panel bg-white border border-slate-200 shadow-sm flex flex-col p-6 z-10">
                     
-                    {/* Location Header */}
-                    <div className="mb-6 flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                            <Activity className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide">Live Telemetry</h4>
-                            <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
-                                Network synchronized
-                            </p>
+                    {/* Location & Status Header */}
+                    <div className="mb-6 flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                                <Activity className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-wide">Traffic Status Center</h4>
+                                <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                                    Section 2 Live Telemetry
+                                </p>
+                            </div>
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-y-5 gap-x-4 flex-1">
-                        {/* Weather Widget */}
-                        {weather?.temperature ? (
-                            <div className="col-span-2 bg-slate-50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
-                                <div>
-                                    <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Live Weather</p>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xl font-black text-slate-900">
-                                            {weather.temperature}°C
-                                        </span>
-                                        <span className="text-xs font-semibold text-slate-600">
-                                            {weather.condition}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="flex flex-col items-end gap-1 text-[10px] font-semibold text-slate-500">
-                                    <span className="flex items-center gap-1"><CloudRain className="w-3 h-3 text-blue-400" /> {weather.rain || 0}mm</span>
-                                    <span className="flex items-center gap-1"><Wind className="w-3 h-3 text-slate-400" /> {weather.wind_speed || 0}km/h</span>
-                                </div>
+                    <div className="grid grid-cols-2 gap-y-4 gap-x-4 flex-1">
+                        {/* 1. Congestion Level with Color Visual Badge */}
+                        <div className="col-span-2 p-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                            <div>
+                                <p className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">Congestion Level</p>
+                                <h4 className="text-lg font-black text-slate-900">{stats.congestionLevel || "Free Flow"} ({stats.congestionScore}%)</h4>
                             </div>
-                        ) : null}
+                            <div>
+                                {stats.congestionScore >= 85 ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-black bg-red-500 text-white shadow-sm flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Severe
+                                    </span>
+                                ) : stats.congestionScore >= 60 ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-black bg-orange-500 text-white shadow-sm flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Heavy
+                                    </span>
+                                ) : stats.congestionScore >= 30 ? (
+                                    <span className="px-3 py-1 rounded-full text-xs font-black bg-amber-500 text-white shadow-sm flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Moderate
+                                    </span>
+                                ) : (
+                                    <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-500 text-white shadow-sm flex items-center gap-1">
+                                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" /> Green Flow
+                                    </span>
+                                )}
+                            </div>
+                        </div>
 
-                        {/* Traffic Status */}
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Traffic Flow</p>
-                            <p className={`text-lg font-black ${trafficError ? 'text-slate-400' : (incidents.length > 5 ? 'text-orange-500' : 'text-emerald-500')}`}>
-                                {trafficError ? 'Offline' : (incidents.length > 5 ? 'Heavy' : 'Free Flow')}
-                            </p>
+                        {/* 2. Road Occupancy */}
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Road Occupancy</p>
+                            <p className="text-lg font-black text-slate-900">{stats.roadOccupancy || "0.0%"}</p>
                         </div>
                         
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Active Incidents</p>
-                            <p className={`text-lg font-black ${incidents.length > 0 ? 'text-red-500' : 'text-slate-900'}`}>{incidents.length}</p>
+                        {/* 3. Traffic Density */}
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Traffic Density</p>
+                            <p className="text-lg font-black text-slate-900">{stats.trafficDensity || "0 veh/km"}</p>
                         </div>
 
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Active Cameras</p>
-                            <p className="text-lg font-black text-slate-900">{cameras.length}</p>
+                        {/* 4. Average Speed */}
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Average Speed</p>
+                            <p className="text-lg font-black text-indigo-600">{stats.avgSpeed.toFixed(1)} km/h</p>
                         </div>
-                        
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">System Load</p>
-                            <p className="text-lg font-black text-blue-600">42 ms</p>
+
+                        {/* 5. Queue Length */}
+                        <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-100">
+                            <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">Queue Length</p>
+                            <p className="text-lg font-black text-blue-600">{stats.queueLength || "0 veh"}</p>
                         </div>
                     </div>
 
                     {/* System Footer */}
-                    <div className="border-t border-slate-100 pt-4 mt-2 space-y-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Cpu className="w-3.5 h-3.5 text-blue-500" />
-                                <span className="text-xs font-bold text-slate-700">AI Processing</span>
-                            </div>
-                            <span className="text-xs font-black text-blue-600 flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" /> Active
-                            </span>
+                    <div className="border-t border-slate-100 pt-4 mt-2 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-600">Model Resolution</span>
+                            <span className="font-bold text-slate-900">{stats.inferenceResolution || "1280x720"}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <Server className="w-3.5 h-3.5 text-emerald-500" />
-                                <span className="text-xs font-bold text-slate-700">TomTom Uplink</span>
-                            </div>
-                            <span className={`text-xs font-bold ${trafficError ? 'text-red-500' : 'text-emerald-500'}`}>
-                                {trafficError ? 'Disconnected' : 'Connected'}
-                            </span>
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-slate-600">Inference Latency</span>
+                            <span className="font-bold text-emerald-600">{stats.processingLatency || stats.latency || "57 ms"}</span>
                         </div>
                     </div>
                 </div>
