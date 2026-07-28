@@ -6,38 +6,41 @@ export interface ANPRVehicle {
     track_id: number;
     vehicle_type: string;
     license_plate: string;
-    canonical_plate: string;
-    raw_ocr: string;
+    canonical_plate?: string;
+    raw_ocr?: string;
     ocr_confidence: number;
     camera_id: string;
-    direction: string;
+    direction?: string;
     first_seen: string;
     last_seen: string;
-    status: string;
+    duration?: string;
+    status: string; // NEW, ACTIVE, LEFT CAMERA, INVALID OCR
     vehicle_snapshot: string;
     plate_snapshot: string;
 }
 
-export interface VehicleProfile extends ANPRVehicle {
-    detection_confidence: number;
-    time_on_screen: string;
-    history: { id: string; event: str; camera_id: str; timestamp: str }[];
-    movement_timeline: { vehicle_id: str; camera: str; timestamp: str; event: str }[];
+export interface SessionMetrics {
+    vehicles_seen: number;
+    unique_plates: number;
+    cars: number;
+    trucks: number;
+    buses: number;
+    motorcycles: number;
+    avg_ocr_confidence: number;
+    current_fps: number;
+    camera_status: string;
 }
 
-export interface SummaryStats {
-    vehicles_today: number;
-    unique_plates: number;
-    repeated_vehicles: number;
-    ocr_accuracy: number;
-    avg_ocr_confidence: number;
-    most_active_camera: string;
-    plates_read: number;
+export interface VehicleProfile extends ANPRVehicle {
+    detection_confidence?: number;
+    time_on_screen?: string;
+    history?: { id: string; event: string; camera_id: string; timestamp: string }[];
 }
 
 interface VehicleState {
     vehicles: ANPRVehicle[];
-    stats: SummaryStats;
+    sessionMetrics: SessionMetrics;
+    sessionDuration: string;
     selectedVehicle: VehicleProfile | null;
     isProfileOpen: boolean;
     isLoading: boolean;
@@ -47,20 +50,14 @@ interface VehicleState {
     searchQuery: string;
     selectedType: string;
     selectedStatus: string;
-    selectedDate: string;
-    lowConfidenceOnly: boolean;
-    repeatedOnly: boolean;
 
     // Actions
     setSearchQuery: (query: string) => void;
     setSelectedType: (type: string) => void;
     setSelectedStatus: (status: string) => void;
-    setSelectedDate: (date: string) => void;
-    setLowConfidenceOnly: (val: boolean) => void;
-    setRepeatedOnly: (val: boolean) => void;
 
-    fetchStats: () => Promise<void>;
-    fetchVehicles: () => Promise<void>;
+    fetchSession: () => Promise<void>;
+    clearSession: () => Promise<void>;
     fetchVehicleProfile: (id: string) => Promise<void>;
     closeProfile: () => void;
     downloadExport: (format: 'csv' | 'excel' | 'pdf') => void;
@@ -68,15 +65,18 @@ interface VehicleState {
 
 export const useVehicleStore = create<VehicleState>((set, get) => ({
     vehicles: [],
-    stats: {
-        vehicles_today: 324,
-        unique_plates: 248,
-        repeated_vehicles: 42,
-        ocr_accuracy: 98.2,
-        avg_ocr_confidence: 94.6,
-        most_active_camera: "Live City Camera 01",
-        plates_read: 310
+    sessionMetrics: {
+        vehicles_seen: 14,
+        unique_plates: 12,
+        cars: 9,
+        trucks: 3,
+        buses: 1,
+        motorcycles: 1,
+        avg_ocr_confidence: 94.8,
+        current_fps: 30.0,
+        camera_status: "Connected"
     },
+    sessionDuration: "4m 12s",
     selectedVehicle: null,
     isProfileOpen: false,
     isLoading: false,
@@ -85,52 +85,67 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
     searchQuery: '',
     selectedType: 'all',
     selectedStatus: 'all',
-    selectedDate: 'all',
-    lowConfidenceOnly: false,
-    repeatedOnly: false,
 
-    setSearchQuery: (query) => { set({ searchQuery: query }); get().fetchVehicles(); },
-    setSelectedType: (type) => { set({ selectedType: type }); get().fetchVehicles(); },
-    setSelectedStatus: (status) => { set({ selectedStatus: status }); get().fetchVehicles(); },
-    setSelectedDate: (date) => { set({ selectedDate: date }); get().fetchVehicles(); },
-    setLowConfidenceOnly: (val) => { set({ lowConfidenceOnly: val }); get().fetchVehicles(); },
-    setRepeatedOnly: (val) => { set({ repeatedOnly: val }); get().fetchVehicles(); },
+    setSearchQuery: (query) => { set({ searchQuery: query }); },
+    setSelectedType: (type) => { set({ selectedType: type }); },
+    setSelectedStatus: (status) => { set({ selectedStatus: status }); },
 
-    fetchStats: async () => {
+    fetchSession: async () => {
+        set({ isLoading: true, error: null });
         try {
-            const res = await api.get('/vehicles/stats');
-            if (res.data) set({ stats: res.data });
+            const res = await api.get('/vehicles/session');
+            if (res.data) {
+                const vehiclesList = Array.isArray(res.data.vehicles) ? res.data.vehicles : [];
+                set({ 
+                    vehicles: vehiclesList, 
+                    sessionMetrics: res.data.metrics || get().sessionMetrics,
+                    sessionDuration: res.data.session_duration || "1m 05s",
+                    isLoading: false 
+                });
+            }
         } catch (err) {
-            console.error("Failed to fetch ANPR summary stats:", err);
+            console.error("Failed to fetch ANPR active session:", err);
+            set({ isLoading: false });
         }
     },
 
-    fetchVehicles: async () => {
-        set({ isLoading: true, error: null });
+    clearSession: async () => {
         try {
-            const { searchQuery, selectedType, selectedStatus, selectedDate, lowConfidenceOnly, repeatedOnly } = get();
-            const params = new URLSearchParams();
-            if (searchQuery) params.append('query', searchQuery);
-            if (selectedType !== 'all') params.append('vehicle_type', selectedType);
-            if (selectedStatus !== 'all') params.append('status', selectedStatus);
-            if (selectedDate !== 'all') params.append('date_filter', selectedDate);
-            if (lowConfidenceOnly) params.append('low_confidence', 'true');
-            if (repeatedOnly) params.append('repeated_only', 'true');
-
-            const res = await api.get(`/vehicles/?${params.toString()}`);
-            set({ vehicles: res.data.items || res.data || [], isLoading: false });
+            await api.post('/session/clear');
+            set({ 
+                vehicles: [], 
+                sessionMetrics: {
+                    vehicles_seen: 0,
+                    unique_plates: 0,
+                    cars: 0,
+                    trucks: 0,
+                    buses: 0,
+                    motorcycles: 0,
+                    avg_ocr_confidence: 0,
+                    current_fps: 30.0,
+                    camera_status: "Connected"
+                },
+                sessionDuration: "0s",
+                selectedVehicle: null,
+                isProfileOpen: false
+            });
         } catch (err) {
-            console.error("Failed to fetch vehicles:", err);
-            set({ error: 'Failed to fetch vehicle records', isLoading: false });
+            console.error("Failed to clear ANPR session:", err);
         }
     },
 
     fetchVehicleProfile: async (id: string) => {
-        try {
-            const res = await api.get(`/vehicles/${id}`);
-            set({ selectedVehicle: res.data, isProfileOpen: true });
-        } catch (err) {
-            console.error("Failed to fetch vehicle profile:", err);
+        const { vehicles } = get();
+        const found = vehicles.find(v => v.id === id);
+        if (found) {
+            set({ selectedVehicle: found as VehicleProfile, isProfileOpen: true });
+        } else {
+            try {
+                const res = await api.get(`/vehicles/${id}`);
+                set({ selectedVehicle: res.data, isProfileOpen: true });
+            } catch (err) {
+                console.error("Failed to fetch vehicle profile:", err);
+            }
         }
     },
 
@@ -139,7 +154,7 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
     downloadExport: (format) => {
         const link = document.createElement('a');
         link.href = `http://localhost:8000/api/v1/vehicles/export/${format}`;
-        link.setAttribute('download', `vehicle_intelligence_${format}.${format === 'excel' ? 'xlsx' : format}`);
+        link.setAttribute('download', `anpr_session_export_${format}.${format === 'excel' ? 'xlsx' : format}`);
         document.body.appendChild(link);
         link.click();
         link.remove();

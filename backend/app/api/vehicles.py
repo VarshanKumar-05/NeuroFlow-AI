@@ -16,6 +16,18 @@ async def get_vehicle_summary_stats(db: AsyncSession = Depends(get_db)):
     service = VehicleService(db)
     return await service.get_summary_stats()
 
+@router.get("/session")
+async def get_active_anpr_session():
+    """Vehicle Intelligence (v5.0): Active In-Memory Session Data."""
+    from app.services.session_manager import anpr_session_manager
+    return anpr_session_manager.get_session_data()
+
+@router.post("/session/clear")
+async def clear_active_anpr_session():
+    """Vehicle Intelligence (v5.0): Wipe In-Memory Session State."""
+    from app.services.session_manager import anpr_session_manager
+    return anpr_session_manager.reset_session()
+
 @router.get("/plates/list")
 async def list_plates(db: AsyncSession = Depends(get_db)):
     """List all recognized license plates."""

@@ -115,10 +115,10 @@ class FrameManager:
             pass
 
     def _capture_loop(self):
-        # Read frames synced to 0.75x of original FPS for smooth, natural playback pacing
+        # Read frames synced to 1.0x of original FPS for smooth, natural playback pacing
         start_time = time.time()
         frames_read = 0
-        pacing_fps = self.fps * 0.75 if self.fps > 0 else 22.5
+        pacing_fps = self.fps if self.fps > 0 else 30.0
         
         while self.is_running:
             if not self.cap or not self.cap.isOpened():

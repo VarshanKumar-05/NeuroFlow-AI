@@ -24,9 +24,10 @@ class DetectionEngine:
         logging.info(f"[Engine] Booting YOLOv11 on {self.device} (FP16: {self.fp16})")
         self.model = YOLO(model_path)
         
-        self.conf_thresh = 0.20
-        self.iou_thresh = 0.50
+        self.conf_thresh = 0.25
+        self.iou_thresh = 0.45
         self.target_classes = [2, 3, 5, 7] # car, motorcycle, bus, truck
+        self.imgsz = 480 if self.device == "cpu" else 640
         
         # Centralized Analytics Engine
         self.analytics = AnalyticsEngine()
@@ -179,7 +180,7 @@ class DetectionEngine:
                     time.sleep(0.016)
                     continue
                     
-                # Inference at full 640 resolution
+                # High-speed inference & tracking
                 results = self.model.track(
                     frame,
                     device=self.device,
@@ -189,7 +190,7 @@ class DetectionEngine:
                     conf=self.conf_thresh,
                     iou=self.iou_thresh,
                     classes=self.target_classes,
-                    imgsz=640,
+                    imgsz=self.imgsz,
                     verbose=False
                 )
                 
