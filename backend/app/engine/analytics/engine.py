@@ -7,6 +7,7 @@ from app.engine.analytics.incidents import IncidentEngine
 from app.engine.analytics.prediction import PredictionEngine
 from app.engine.analytics.recommendations import RecommendationEngine
 from app.engine.analytics.system_health import SystemHealthAnalyzer
+from app.incident_engine.orchestrator import incident_orchestrator
 
 class AnalyticsEngine:
     def __init__(self):
@@ -132,8 +133,9 @@ class AnalyticsEngine:
         # 2. Update Occupancy Analyzer
         lane_ratio, _ = self.occupancy.calculate(frame_width, current_frame_tracks)
         
-        # 3. Update Incident Engine
+        # 3. Update Incident Engine & Multi-Factor AI Incident Detection Engine
         self.incidents.check_incidents(self.track_history, current_frame_tracks)
+        incident_orchestrator.process_frame(frame=None, stabilized_objects=stabilized_objects, camera_id="Live City Camera 01")
         active_incidents = self.incidents.get_incidents_list()
         stopped_vehicles = len([i for i in active_incidents if i['status'] == 'active' and i['type'] == 'Stopped Vehicle'])
         
