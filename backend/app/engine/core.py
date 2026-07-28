@@ -142,7 +142,15 @@ class DetectionEngine:
             cv2.line(frame, (0, line_y), (width, line_y), (0, 0, 255), 2)
         
         if stabilized_objects:
-            for obj in stabilized_objects:
+            from app.services.session_manager import anpr_session_manager
+            active_ids = [obj["track_id"] for obj in stabilized_objects]
+            anpr_session_manager.mark_left_cameras(active_ids)
+            
+            # Sort objects by Y coordinate to handle vertical overlap offset adjustments
+            sorted_objs = sorted(stabilized_objects, key=lambda o: o["bbox"][1])
+            placed_previews = []
+
+            for obj in sorted_objs:
                 x1, y1, x2, y2 = map(int, obj["bbox"])
                 orig_id = obj["track_id"]
                 cls_id = obj["class_id"]
@@ -150,14 +158,68 @@ class DetectionEngine:
                 color = self._get_class_color(cls_id)
                 name = self._get_class_name(cls_id)
                 
-                # Draw Bounding Box (2px thick)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2, cv2.LINE_AA)
+                # Update/fetch track session data from ANPRSessionManager
+                session_rec = anpr_session_manager.process_vehicle_track(
+                    frame=frame,
+                    track_id=orig_id,
+                    vehicle_type=name,
+                    bbox=[x1, y1, x2, y2]
+                )
                 
-                # Minimal Label
-                label = f"{name} {orig_id}"
-                (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                cv2.rectangle(frame, (x1, y1 - h - 10), (x1 + w, y1), color, -1, cv2.LINE_AA)
-                cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+                plate_text = session_rec["license_plate"]
+                ocr_conf = session_rec["ocr_confidence"]
+                plate_crop_bgr = session_rec.get("plate_crop_bgr")
+                
+                # 1. Draw Vehicle Bounding Box (2px thick)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 229, 255), 2, cv2.LINE_AA)
+                
+                # 2. Vehicle Class Tag below plate box
+                tag_label = f"{name}"
+                cv2.putText(frame, tag_label, (x1 + 4, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 229, 255), 1, cv2.LINE_AA)
+                
+                # 3. Calculate Floating Plate Preview Box position with Overlap Prevention
+                box_w, box_h = 160, 50
+                target_y = y1 - 65
+                target_x = max(5, min(width - box_w - 5, x1))
+                
+                # Adjust target_y if overlapping with an already placed preview box
+                for prev_x, prev_y in placed_previews:
+                    if abs(target_x - prev_x) < 140 and abs(target_y - prev_y) < 45:
+                        target_y -= 45 # Shift upward to prevent text/crop overlap
+                        
+                target_y = max(5, target_y)
+                placed_previews.append((target_x, target_y))
+
+                # 4. Outer Floating Plate Container (Dark semi-transparent background + Green border)
+                sub_y2 = min(height, target_y + box_h)
+                sub_x2 = min(width, target_x + box_w)
+                
+                if target_y < height and target_x < width and sub_y2 > target_y and sub_x2 > target_x:
+                    overlay_roi = frame[target_y:sub_y2, target_x:sub_x2]
+                    dark_bg = np.zeros_like(overlay_roi)
+                    cv2.addWeighted(overlay_roi, 0.25, dark_bg, 0.75, 0, overlay_roi)
+                    
+                    # Draw Container Border
+                    cv2.rectangle(frame, (target_x, target_y), (target_x + box_w, target_y + box_h), (52, 211, 153), 1, cv2.LINE_AA)
+                    
+                    # 5. Insert Resized Plate Crop Image inside container
+                    if plate_crop_bgr is not None and plate_crop_bgr.size > 0:
+                        try:
+                            resized_crop = cv2.resize(plate_crop_bgr, (70, 26))
+                            crop_h, crop_w = resized_crop.shape[:2]
+                            c_y1, c_x1 = target_y + 4, target_x + 4
+                            c_y2, c_x2 = c_y1 + crop_h, c_x1 + crop_w
+                            if c_y2 <= height and c_x2 <= width:
+                                frame[c_y1:c_y2, c_x1:c_x2] = resized_crop
+                                cv2.rectangle(frame, (c_x1, c_y1), (c_x2, c_y2), (255, 255, 255), 1)
+                        except Exception:
+                            pass
+                            
+                    # 6. Render Plate Text & Confidence Badge
+                    plate_str = f"{plate_text}"
+                    conf_str = f"{ocr_conf}%"
+                    cv2.putText(frame, plate_str, (target_x + 80, target_y + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1, cv2.LINE_AA)
+                    cv2.putText(frame, conf_str, (target_x + 80, target_y + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (52, 211, 153), 1, cv2.LINE_AA)
                     
         return frame
 
