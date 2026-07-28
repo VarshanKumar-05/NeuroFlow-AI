@@ -118,10 +118,12 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
             if (repeatedOnly) params.append('repeated_only', 'true');
 
             const res = await api.get(`/vehicles/?${params.toString()}`);
-            set({ vehicles: res.data.items || res.data || [], isLoading: false });
+            const rawItems = res.data?.items || res.data;
+            const items = Array.isArray(rawItems) ? rawItems : [];
+            set({ vehicles: items, isLoading: false });
         } catch (err) {
             console.error("Failed to fetch vehicles:", err);
-            set({ error: 'Failed to fetch vehicle records', isLoading: false });
+            set({ vehicles: [], error: 'Failed to fetch vehicle records', isLoading: false });
         }
     },
 

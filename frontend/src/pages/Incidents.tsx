@@ -278,10 +278,10 @@ export default function Incidents() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={10} className="text-center py-6 text-slate-500">Loading incident records...</TableCell></TableRow>
-              ) : incidents.length === 0 ? (
+              ) : !Array.isArray(incidents) || incidents.length === 0 ? (
                 <TableRow><TableCell colSpan={10} className="text-center py-6 text-slate-500">No emergency incident records found.</TableCell></TableRow>
               ) : (
-                incidents.map((inc: EmergencyIncident) => (
+                (Array.isArray(incidents) ? incidents : []).map((inc: EmergencyIncident) => (
                   <TableRow key={inc.id} onClick={() => fetchIncidentProfile(inc.id)} className="border-slate-800/60 hover:bg-slate-800/40 cursor-pointer transition-colors">
                     <TableCell>
                       <div className="w-14 h-10 rounded-md bg-slate-950 overflow-hidden border border-slate-800 shrink-0">

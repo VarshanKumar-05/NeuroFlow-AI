@@ -179,10 +179,10 @@ export default function Vehicles() {
 
               {/* Animated Detection Cards Stream */}
               <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
-                {vehicles.length === 0 ? (
+                {!Array.isArray(vehicles) || vehicles.length === 0 ? (
                   <div className="text-center py-10 text-slate-500 text-xs font-medium">Awaiting live ANPR detections...</div>
                 ) : (
-                  vehicles.slice(0, 6).map((v: ANPRVehicle, idx: number) => (
+                  (Array.isArray(vehicles) ? vehicles : []).slice(0, 6).map((v: ANPRVehicle, idx: number) => (
                     <div 
                       key={v.id || idx}
                       onClick={() => fetchVehicleProfile(v.id)}
@@ -293,10 +293,10 @@ export default function Vehicles() {
             <TableBody>
               {isLoading ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-6 text-slate-500">Loading ANPR database...</TableCell></TableRow>
-              ) : vehicles.length === 0 ? (
+              ) : !Array.isArray(vehicles) || vehicles.length === 0 ? (
                 <TableRow><TableCell colSpan={9} className="text-center py-6 text-slate-500">No ANPR vehicle records found.</TableCell></TableRow>
               ) : (
-                vehicles.map((v: ANPRVehicle) => (
+                (Array.isArray(vehicles) ? vehicles : []).map((v: ANPRVehicle) => (
                   <TableRow 
                     key={v.id} 
                     onClick={() => fetchVehicleProfile(v.id)}

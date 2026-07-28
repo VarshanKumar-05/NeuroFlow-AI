@@ -112,10 +112,12 @@ export const useIncidentStore = create<IncidentState>((set, get) => ({
             if (selectedDate !== 'all') params.append('date_filter', selectedDate);
 
             const res = await api.get(`/incidents/?${params.toString()}`);
-            set({ incidents: res.data.items || res.data || [], isLoading: false });
+            const rawItems = res.data?.items || res.data;
+            const items = Array.isArray(rawItems) ? rawItems : [];
+            set({ incidents: items, isLoading: false });
         } catch (err) {
             console.error("Failed to fetch incidents:", err);
-            set({ error: 'Failed to fetch emergency incidents', isLoading: false });
+            set({ incidents: [], error: 'Failed to fetch emergency incidents', isLoading: false });
         }
     },
 
