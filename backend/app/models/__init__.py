@@ -10,6 +10,8 @@ from .audit_log import AuditLog
 from .detection import Detection
 from .traffic_metric import TrafficMetric
 from .incident import Incident
+from .incident_evidence import IncidentEvidence
+from .incident_history import IncidentHistory
 from .prediction import Prediction
 from .report import Report
 from .notification import Notification

@@ -123,4 +123,75 @@ class ExportService:
             # Fallback simple text PDF buffer
             return f"NEUROFLOW ANPR REPORT - {len(vehicles)} VEHICLES RECORDED".encode('utf-8')
 
+    @staticmethod
+    def generate_incident_csv(incidents: List[Dict[str, Any]]) -> str:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        writer.writerow([
+            "Incident ID", "Type", "Severity", "Priority", "Confidence %", 
+            "Camera", "Timestamp", "Status", "Assigned Operator", "Vehicles Involved"
+        ])
+        
+        for inc in incidents:
+            writer.writerow([
+                inc.get("id", ""),
+                inc.get("incident_type", ""),
+                inc.get("severity", ""),
+                inc.get("priority", ""),
+                inc.get("confidence", 0.0),
+                inc.get("camera_id", ""),
+                inc.get("timestamp", ""),
+                inc.get("status", ""),
+                inc.get("assigned_operator", ""),
+                inc.get("vehicles_involved", "")
+            ])
+            
+        return output.getvalue()
+
+    @staticmethod
+    def generate_incident_pdf(incidents: List[Dict[str, Any]]) -> bytes:
+        try:
+            from reportlab.lib.pagesizes import letter
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.lib import colors
+
+            buffer = io.BytesIO()
+            doc = SimpleDocTemplate(buffer, pagesize=letter)
+            styles = getSampleStyleSheet()
+            elements = []
+
+            elements.append(Paragraph("<b>NEUROFLOW — EMERGENCY INCIDENT MANAGEMENT REPORT</b>", styles['Title']))
+            elements.append(Paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal']))
+            elements.append(Spacer(1, 15))
+
+            data = [["Incident ID", "Type", "Sev", "Prio", "Camera", "Status", "Time"]]
+            for inc in incidents[:30]:
+                data.append([
+                    str(inc.get("id", ""))[:8],
+                    str(inc.get("incident_type", "")),
+                    str(inc.get("severity", "")),
+                    str(inc.get("priority", "")),
+                    str(inc.get("camera_id", "")),
+                    str(inc.get("status", "")),
+                    str(inc.get("timestamp", ""))
+                ])
+
+            t = Table(data)
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#EF4444')),
+                ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                ('BOTTOMPADDING', (0,0), (-1,0), 8),
+                ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#FEF2F2')),
+                ('GRID', (0,0), (-1,-1), 1, colors.HexColor('#FCA5A5')),
+            ]))
+            elements.append(t)
+            doc.build(elements)
+            return buffer.getvalue()
+        except ImportError:
+            return f"NEUROFLOW EMERGENCY INCIDENT REPORT - {len(incidents)} INCIDENTS RECORDED".encode('utf-8')
+
 export_service = ExportService()
