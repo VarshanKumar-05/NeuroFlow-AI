@@ -220,7 +220,7 @@ export default function Incidents() {
                   </div>
                 </TableCell>
                 <TableCell className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                  INC-{inc.id.split('-')[0].upper()}
+                  INC-{inc.id.split('-')[0].toUpperCase()}
                 </TableCell>
                 <TableCell className="font-bold text-sm text-slate-900 dark:text-white">
                   {inc.incident_type}
@@ -282,7 +282,7 @@ export default function Incidents() {
                   <AlertTriangle className="w-6 h-6 text-red-500" />
                   <div>
                     <h3 className="text-xl font-bold text-slate-900 dark:text-white">Emergency Command Profile</h3>
-                    <p className="text-xs text-slate-500">Incident ID: INC-{selectedIncident.id.split('-')[0].upper()}</p>
+                    <p className="text-xs text-slate-500">Incident ID: INC-{selectedIncident.id.split('-')[0].toUpperCase()}</p>
                   </div>
                 </div>
                 <button onClick={closeDetail} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
