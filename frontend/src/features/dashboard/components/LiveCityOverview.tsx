@@ -45,7 +45,7 @@ export function LiveCityOverview() {
     } = useLocationStore();
     
     const wsConnected = useWSStore(state => state.isConnected);
-    const { cameras } = useTrafficStore();
+    const { cameras, stats } = useTrafficStore();
     const [initSteps, setInitSteps] = useState(0);
 
     const [trafficError, setTrafficError] = useState(false);
