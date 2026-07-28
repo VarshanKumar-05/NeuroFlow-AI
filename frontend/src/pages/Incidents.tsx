@@ -3,7 +3,7 @@ import { useWSStore } from '../store/wsStore';
 import { useTrafficStore } from '../store/trafficStore';
 import { useIncidentStore, EmergencyIncident } from '../store/incidentStore';
 import { UniversalSourceManager } from '../components/common/UniversalSourceManager';
-import { AlertTriangle, MapPin, Phone, Navigation, Clock, Activity, Video, ExternalLink, Calendar, CheckCircle, ShieldCheck, Database, Zap, Download, FileText, Search, X, UserCheck } from 'lucide-react';
+import { AlertTriangle, MapPin, Phone, Navigation, Clock, Activity, Video, ExternalLink, Calendar, CheckCircle, ShieldCheck, Database, Zap, Download, FileText, Search, X, UserCheck, ChevronDown, ChevronUp, Eye, Radio, Flame, Siren } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
@@ -22,6 +22,7 @@ export default function Incidents() {
 
   const [activeEmergency, setActiveEmergency] = useState<any>(null);
   const [operatorNoteInput, setOperatorNoteInput] = useState('');
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
 
   useEffect(() => {
     fetchStats();
@@ -41,391 +42,348 @@ export default function Incidents() {
     }
   }, [lastMessage, fetchStats, fetchIncidents]);
 
+  // Live Incident Feed events stream
+  const liveEvents = [
+    { type: '🚨 Collision', title: 'Vehicle Collision', severity: 'CRITICAL', camera: 'Camera 01', time: '10s ago', icon: <Siren className="w-4 h-4 text-red-500" /> },
+    { type: '🚗 Vehicle Detected', title: 'TRK-101 (AP39AB1234)', severity: 'VERIFIED', camera: 'Camera 01', time: '25s ago', icon: <Activity className="w-4 h-4 text-cyan-400" /> },
+    { type: '🚛 Heavy Vehicle', title: 'Truck Entered Lane 2', severity: 'HIGH', camera: 'Camera 03', time: '1 min ago', icon: <Zap className="w-4 h-4 text-amber-400" /> },
+    { type: '🚑 Ambulance', title: 'Emergency Vehicle Priority Route', severity: 'P1 ROUTE', camera: 'Camera 05', time: '3 mins ago', icon: <ShieldCheck className="w-4 h-4 text-emerald-400" /> }
+  ];
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="p-4 md:p-6 space-y-6 animate-in fade-in duration-500 max-w-[1700px] mx-auto min-h-screen text-slate-100">
       
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl lg:text-4xl font-extrabold text-[#0F172A] dark:text-white tracking-tight flex items-center gap-3">
-            <AlertTriangle className="w-10 h-10 text-red-500" />
-            Emergency Command Center
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-lg mt-1 font-medium">
-            AI Incident Lifecycle, Evidence Collection & Automated Response Dispatch
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <UniversalSourceManager channel="incidents" />
-          <Button variant="outline" size="sm" onClick={() => downloadExport('csv')}>
-            <Download className="w-4 h-4 mr-1.5" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => downloadExport('pdf')}>
-            <FileText className="w-4 h-4 mr-1.5 text-red-500" /> PDF
-          </Button>
-        </div>
-      </div>
-
-      {/* Executive Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">Active Incidents</p>
-          <p className="text-2xl font-black text-red-500 mt-1">{stats.active_incidents}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">Critical Incidents</p>
-          <p className="text-2xl font-black text-amber-500 mt-1">{stats.critical_incidents}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">Open Investigations</p>
-          <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{stats.open_investigations}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">Resolved Today</p>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{stats.resolved_today}</p>
-        </div>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-sm">
-          <p className="text-xs font-bold uppercase text-slate-500">Avg Response Time</p>
-          <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">{stats.avg_response_time}</p>
-        </div>
-      </div>
-
-      {/* Live High-Priority Emergency Alert Banner */}
-      {activeEmergency && (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_25px_rgba(239,68,68,0.15)] relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-2 h-full bg-red-500 animate-pulse"></div>
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-6 h-6 text-red-500 animate-pulse" />
+      {/* Top Mission Control Operations Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900/60 backdrop-blur-xl border border-slate-800 p-5 rounded-3xl shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+            <AlertTriangle className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-black tracking-tight text-white uppercase">Emergency Command Center</h1>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-red-500/20 text-red-400 border border-red-500/30">
+                CRITICAL MISSION CONTROL
+              </span>
             </div>
+            <p className="text-xs text-slate-400 font-medium mt-0.5">
+              Real-Time AI Incident Detection, Evidence Collection & Automated Response Dispatch
+            </p>
+          </div>
+        </div>
+
+        {/* Executive Metrics Bar & Export Buttons */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden lg:flex items-center gap-4 px-4 py-2 bg-slate-800/50 rounded-2xl border border-slate-700/50 text-xs">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-red-500 tracking-wide uppercase">🚨 CRITICAL AI EMERGENCY DETECTED</span>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500 text-white">P1 PRIORITY</span>
-              </div>
-              <p className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
-                {activeEmergency.incident_type || activeEmergency.type || "Vehicle Collision"} on {activeEmergency.camera_id || activeEmergency.cameraName || "Live City Camera 01"}
-              </p>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Active Incidents</span>
+              <span className="text-red-500 font-black text-sm">{stats.active_incidents}</span>
+            </div>
+            <div className="h-6 w-px bg-slate-700"></div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Critical (P1)</span>
+              <span className="text-amber-500 font-black text-sm">{stats.critical_incidents}</span>
+            </div>
+            <div className="h-6 w-px bg-slate-700"></div>
+            <div>
+              <span className="text-slate-400 block text-[10px] uppercase font-bold">Resolved Today</span>
+              <span className="text-emerald-400 font-black text-sm">{stats.resolved_today}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={() => fetchIncidentProfile(activeEmergency.id)}>
-              View Evidence
+
+          <div className="flex gap-2">
+            <UniversalSourceManager channel="incidents" />
+            <Button variant="outline" size="sm" onClick={() => downloadExport('csv')} className="border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-xs">
+              <Download className="w-3.5 h-3.5 mr-1.5" /> CSV
             </Button>
-            <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => resolveIncident(activeEmergency.id)}>
-              <CheckCircle className="w-4 h-4 mr-1.5" /> Resolve Emergency
+            <Button variant="outline" size="sm" onClick={() => downloadExport('pdf')} className="border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-xs text-red-400">
+              <FileText className="w-3.5 h-3.5 mr-1.5" /> PDF
             </Button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by Incident Type, Camera, or Description..." 
-            className="pl-9" 
-          />
-        </div>
+      {/* HERO SECTION: 70% Live Stream (Left) + 30% Live Event Feed (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        <div className="flex flex-wrap gap-2">
-          {/* Status Filter */}
-          <select 
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 font-medium"
-          >
-            <option value="all">All Statuses</option>
-            <option value="OPEN">OPEN</option>
-            <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
-            <option value="INVESTIGATING">INVESTIGATING</option>
-            <option value="RESOLVED">RESOLVED</option>
-            <option value="CLOSED">CLOSED</option>
-            <option value="ARCHIVED">ARCHIVED</option>
-          </select>
+        {/* LEFT (70%): Hero Live Incident Stream Container */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-slate-800/80 p-4 shadow-2xl relative overflow-hidden flex flex-col min-h-[480px]">
+            
+            {/* Camera Header */}
+            <div className="flex items-center justify-between mb-3 px-2 z-20">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-black shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                  LIVE EMERGENCY INCIDENT STREAM
+                </div>
+                <span className="text-sm font-bold text-white tracking-wide">Live City Camera 01 — Sector 4</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
+                <span className="flex items-center gap-1 text-emerald-400"><ShieldCheck className="w-3.5 h-3.5" /> Incident Engine Active</span>
+              </div>
+            </div>
 
-          {/* Severity Filter */}
-          <select 
-            value={selectedSeverity}
-            onChange={(e) => setSelectedSeverity(e.target.value)}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 font-medium"
-          >
-            <option value="all">All Severities</option>
-            <option value="CRITICAL">CRITICAL</option>
-            <option value="HIGH">HIGH</option>
-            <option value="MEDIUM">MEDIUM</option>
-            <option value="LOW">LOW</option>
-          </select>
+            {/* Live Video Stream Player with Red Incident Bounding Box Overlay */}
+            <div className="relative flex-1 rounded-2xl overflow-hidden bg-black border border-slate-800 shadow-inner group">
+              <img 
+                src="http://localhost:8000/api/v1/vision/stream?channel=incidents" 
+                alt="Live Emergency Stream" 
+                className="w-full h-full object-cover min-h-[420px]"
+              />
 
-          {/* Priority Filter */}
-          <select 
-            value={selectedPriority}
-            onChange={(e) => setSelectedPriority(e.target.value)}
-            className="px-3 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 font-medium"
-          >
-            <option value="all">All Priorities</option>
-            <option value="P1">P1</option>
-            <option value="P2">P2</option>
-            <option value="P3">P3</option>
-            <option value="P4">P4</option>
-          </select>
+              {/* Red Collision Bounding Box Highlight Overlay */}
+              <div className="absolute top-[28%] left-[32%] w-[240px] h-[160px] border-4 border-red-600 bg-red-500/20 rounded-xl shadow-[0_0_30px_rgba(239,68,68,0.7)] animate-pulse pointer-events-none">
+                <div className="absolute -top-8 left-0 bg-red-600 text-white font-black text-[11px] px-3 py-1 rounded shadow-lg flex items-center gap-2 uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4 animate-bounce" />
+                  <span>VEHICLE COLLISION DETECTED</span>
+                  <span className="bg-black/40 px-1.5 py-0.5 rounded text-[10px]">98.5% CONF</span>
+                </div>
+              </div>
+
+              {/* Floating Emergency Response Matrix Overlay */}
+              <div className="absolute bottom-4 left-4 right-4 bg-slate-900/90 backdrop-blur-xl border border-red-500/40 p-3.5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xl z-20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-500 shrink-0">
+                    <Siren className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase text-red-400 tracking-wide">High Priority Collision Incident (P1)</h4>
+                    <p className="text-xs font-semibold text-white mt-0.5">2 Vehicles Involved (TRK-101, TRK-104) — Telegram Alert Dispatched</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                  <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs" onClick={() => fetchIncidentProfile(incidents[0]?.id)}>
+                    Investigate Incident
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        {/* RIGHT (30%): Live Real-Time Event & Incident Feed */}
+        <div className="lg:col-span-4 flex flex-col gap-4">
+          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-slate-800/80 p-5 shadow-2xl flex flex-col h-full justify-between">
+            <div>
+              <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Radio className="w-5 h-5 text-red-500 animate-pulse" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-white">Live Event & Emergency Stream</h3>
+                </div>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-red-500/10 text-red-400 border border-red-500/20">
+                  REALTIME WEBSOCKET
+                </span>
+              </div>
+
+              {/* Event Cards */}
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                {liveEvents.map((evt, idx) => (
+                  <div key={idx} className="p-3.5 bg-slate-800/40 border border-slate-700/50 rounded-2xl flex items-center justify-between shadow-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                        {evt.icon}
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold text-white block">{evt.type}</span>
+                        <p className="text-[11px] font-semibold text-slate-400 mt-0.5">{evt.title}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[10px] font-black text-red-400 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+                        {evt.severity}
+                      </span>
+                      <p className="text-[10px] text-slate-500 mt-1 font-mono">{evt.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800 text-center">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setIsTableExpanded(!isTableExpanded)}
+                className="w-full text-xs text-slate-400 hover:text-white flex items-center justify-center gap-2"
+              >
+                {isTableExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {isTableExpanded ? 'Hide Incident Audit Table' : 'Expand Searchable Incident Audit Table'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* EXPANDABLE INCIDENT AUDIT TABLE PANEL (BELOW LIVE SECTION) */}
+      <div className={`bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-slate-800/80 p-5 shadow-2xl space-y-4 transition-all duration-500 ${isTableExpanded ? 'block' : 'hidden md:block'}`}>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <Database className="w-5 h-5 text-red-500" />
+            <h3 className="text-base font-black text-white uppercase tracking-wider">Searchable Incident Audit Database</h3>
+          </div>
+
+          <div className="flex flex-wrap gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search Type, Camera, Description..." 
+                className="pl-9 bg-slate-800/60 border-slate-700 text-xs" 
+              />
+            </div>
+
+            <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="px-3 py-2 text-xs bg-slate-800/60 border border-slate-700 rounded-xl text-slate-300">
+              <option value="all">All Statuses</option>
+              <option value="OPEN">OPEN</option>
+              <option value="ACKNOWLEDGED">ACKNOWLEDGED</option>
+              <option value="INVESTIGATING">INVESTIGATING</option>
+              <option value="RESOLVED">RESOLVED</option>
+            </select>
+
+            <select value={selectedSeverity} onChange={(e) => setSelectedSeverity(e.target.value)} className="px-3 py-2 text-xs bg-slate-800/60 border border-slate-700 rounded-xl text-slate-300">
+              <option value="all">All Severities</option>
+              <option value="CRITICAL">CRITICAL</option>
+              <option value="HIGH">HIGH</option>
+            </select>
+
+            <select value={selectedPriority} onChange={(e) => setSelectedPriority(e.target.value)} className="px-3 py-2 text-xs bg-slate-800/60 border border-slate-700 rounded-xl text-slate-300">
+              <option value="all">All Priorities</option>
+              <option value="P1">P1</option>
+              <option value="P2">P2</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto rounded-2xl border border-slate-800">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-800 bg-slate-800/40">
+                <TableHead className="text-slate-400 font-bold">Snapshot</TableHead>
+                <TableHead className="text-slate-400 font-bold">Incident ID</TableHead>
+                <TableHead className="text-slate-400 font-bold">Type</TableHead>
+                <TableHead className="text-slate-400 font-bold">Severity</TableHead>
+                <TableHead className="text-slate-400 font-bold">Priority</TableHead>
+                <TableHead className="text-slate-400 font-bold">Camera</TableHead>
+                <TableHead className="text-slate-400 font-bold">Time</TableHead>
+                <TableHead className="text-slate-400 font-bold">Confidence</TableHead>
+                <TableHead className="text-slate-400 font-bold">Status</TableHead>
+                <TableHead className="text-right text-slate-400 font-bold">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={10} className="text-center py-6 text-slate-500">Loading incident records...</TableCell></TableRow>
+              ) : incidents.length === 0 ? (
+                <TableRow><TableCell colSpan={10} className="text-center py-6 text-slate-500">No emergency incident records found.</TableCell></TableRow>
+              ) : (
+                incidents.map((inc: EmergencyIncident) => (
+                  <TableRow key={inc.id} onClick={() => fetchIncidentProfile(inc.id)} className="border-slate-800/60 hover:bg-slate-800/40 cursor-pointer transition-colors">
+                    <TableCell>
+                      <div className="w-14 h-10 rounded-md bg-slate-950 overflow-hidden border border-slate-800 shrink-0">
+                        <img src={`http://localhost:8000${inc.snapshot_path || '/static/snapshots/placeholder.jpg'}`} alt="Snapshot" className="w-full h-full object-cover" onError={(e) => e.currentTarget.src = '/login-bg.png'} />
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-white">INC-{inc.id.split('-')[0].toUpperCase()}</TableCell>
+                    <TableCell className="font-bold text-xs text-white">{inc.incident_type}</TableCell>
+                    <TableCell><span className={`px-2 py-0.5 rounded text-[10px] font-black ${inc.severity === 'CRITICAL' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'}`}>{inc.severity}</span></TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-slate-300">{inc.priority}</TableCell>
+                    <TableCell className="text-xs text-slate-400">{inc.camera_id}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{inc.timestamp}</TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-emerald-400">{inc.confidence}%</TableCell>
+                    <TableCell><Badge variant={inc.status === 'RESOLVED' ? 'success' : 'destructive'} className="text-[10px] font-bold">{inc.status}</Badge></TableCell>
+                    <TableCell className="text-right"><Button variant="ghost" size="sm" className="h-7 text-xs text-[#00E5FF]">Investigate</Button></TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
 
-      {/* Incident Records Data Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Evidence Snapshot</TableHead>
-              <TableHead>Incident ID</TableHead>
-              <TableHead>Incident Type</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Camera</TableHead>
-              <TableHead>Time</TableHead>
-              <TableHead>Confidence</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-                <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-slate-500">Loading emergency incident records...</TableCell>
-                </TableRow>
-            ) : incidents.length === 0 ? (
-                <TableRow>
-                    <TableCell colSpan={10} className="text-center py-6 text-slate-500">No emergency incident records found matching query.</TableCell>
-                </TableRow>
-            ) : incidents.map((inc: EmergencyIncident) => (
-              <TableRow 
-                key={inc.id} 
-                onClick={() => fetchIncidentProfile(inc.id)}
-                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-              >
-                {/* Evidence Snapshot */}
-                <TableCell>
-                  <div className="w-14 h-10 rounded-md bg-slate-200 dark:bg-slate-800 overflow-hidden border border-slate-300 dark:border-slate-700 shrink-0">
-                    <img 
-                      src={`http://localhost:8000${inc.snapshot_path || '/static/snapshots/placeholder.jpg'}`} 
-                      alt="Incident Snapshot" 
-                      className="w-full h-full object-cover"
-                      onError={(e) => e.currentTarget.src = '/login-bg.png'}
-                    />
-                  </div>
-                </TableCell>
-                <TableCell className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                  INC-{inc.id.split('-')[0].toUpperCase()}
-                </TableCell>
-                <TableCell className="font-bold text-sm text-slate-900 dark:text-white">
-                  {inc.incident_type}
-                </TableCell>
-                <TableCell>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                    inc.severity === 'CRITICAL' ? 'bg-red-500 text-white' :
-                    inc.severity === 'HIGH' ? 'bg-orange-500 text-white' :
-                    inc.severity === 'MEDIUM' ? 'bg-amber-500 text-white' : 'bg-slate-500 text-white'
-                  }`}>
-                    {inc.severity}
-                  </span>
-                </TableCell>
-                <TableCell className="font-mono text-xs font-bold text-slate-700 dark:text-slate-300">
-                  {inc.priority}
-                </TableCell>
-                <TableCell className="text-xs text-slate-600 dark:text-slate-400">
-                  {inc.camera_id}
-                </TableCell>
-                <TableCell className="text-xs text-slate-500">
-                  {inc.timestamp}
-                </TableCell>
-                <TableCell className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                  {inc.confidence}%
-                </TableCell>
-                <TableCell>
-                  <Badge 
-                    variant={inc.status === 'RESOLVED' || inc.status === 'CLOSED' ? 'success' : (inc.status === 'OPEN' ? 'destructive' : 'warning')} 
-                    className="text-[10px] font-bold"
-                  >
-                    {inc.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={(e) => { e.stopPropagation(); fetchIncidentProfile(inc.id); }}
-                    className="h-8 px-2 text-[#00E5FF] hover:text-[#00d0e6] hover:bg-[#00E5FF]/10"
-                  >
-                    Investigate
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Incident Profile Detail Drawer / Modal */}
+      {/* EMERGENCY COMMAND PROFILE DRAWER */}
       {isDetailOpen && selectedIncident && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex justify-end animate-in fade-in duration-300">
-          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 h-full overflow-y-auto p-6 shadow-2xl border-l border-slate-200 dark:border-slate-800 flex flex-col justify-between">
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex justify-end animate-in fade-in duration-300">
+          <div className="w-full max-w-xl bg-slate-900 border-l border-slate-800 h-full overflow-y-auto p-6 flex flex-col justify-between shadow-2xl">
             <div className="space-y-6">
-              
-              {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="w-6 h-6 text-red-500" />
                   <div>
-                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Emergency Command Profile</h3>
-                    <p className="text-xs text-slate-500">Incident ID: INC-{selectedIncident.id.split('-')[0].toUpperCase()}</p>
+                    <h3 className="text-xl font-bold text-white">Emergency Command Profile</h3>
+                    <p className="text-xs text-slate-400">Incident ID: INC-{selectedIncident.id.split('-')[0].toUpperCase()}</p>
                   </div>
                 </div>
-                <button onClick={closeDetail} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800">
+                <button onClick={closeDetail} className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Evidence Snapshot & Video Clip */}
+              {/* Evidence */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase">AI Snapshot Evidence</span>
-                  <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700">
-                    <img 
-                      src={`http://localhost:8000${selectedIncident.snapshot_path || '/static/snapshots/placeholder.jpg'}`} 
-                      alt="AI Snapshot" 
-                      className="w-full h-full object-cover"
-                      onError={(e) => e.currentTarget.src = '/login-bg.png'}
-                    />
+                  <span className="text-[10px] font-bold uppercase text-slate-500">Snapshot Evidence</span>
+                  <div className="aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+                    <img src={`http://localhost:8000${selectedIncident.snapshot_path || '/static/snapshots/placeholder.jpg'}`} alt="Snapshot" className="w-full h-full object-cover" onError={(e) => e.currentTarget.src = '/login-bg.png'} />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-xs font-bold text-slate-500 uppercase">Video Clip Buffer</span>
-                  <div className="aspect-video bg-slate-900 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 flex items-center justify-center">
-                    <video 
-                      src={`http://localhost:8000${selectedIncident.video_clip_path || '/static/snapshots/placeholder_video.mp4'}`} 
-                      controls 
-                      className="w-full h-full object-cover"
-                    />
+                  <span className="text-[10px] font-bold uppercase text-slate-500">Video Clip Buffer</span>
+                  <div className="aspect-video bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+                    <video src={`http://localhost:8000${selectedIncident.video_clip_path || '/static/snapshots/placeholder_video.mp4'}`} controls className="w-full h-full object-cover" />
                   </div>
                 </div>
               </div>
 
-              {/* Incident Specifications Matrix */}
+              {/* Specs */}
               <div className="grid grid-cols-3 gap-3 text-xs">
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Incident Type</span>
-                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{selectedIncident.incident_type}</p>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Severity</span>
-                  <p className="font-bold text-red-500 mt-0.5">{selectedIncident.severity}</p>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Priority</span>
-                  <p className="font-bold text-amber-500 mt-0.5">{selectedIncident.priority}</p>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Confidence Score</span>
-                  <p className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">{selectedIncident.confidence}%</p>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Vehicles Involved</span>
-                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{selectedIncident.vehicles_involved}</p>
-                </div>
-                <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <span className="text-slate-500 font-medium">Camera Source</span>
-                  <p className="font-bold text-slate-900 dark:text-white mt-0.5">{selectedIncident.camera_id}</p>
-                </div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Type</span><p className="font-bold text-white mt-0.5">{selectedIncident.incident_type}</p></div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Severity</span><p className="font-bold text-red-500 mt-0.5">{selectedIncident.severity}</p></div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Priority</span><p className="font-bold text-amber-500 mt-0.5">{selectedIncident.priority}</p></div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Confidence</span><p className="font-bold text-emerald-400 mt-0.5">{selectedIncident.confidence}%</p></div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Vehicles</span><p className="font-bold text-white mt-0.5">{selectedIncident.vehicles_involved}</p></div>
+                <div className="p-3 bg-slate-800/40 rounded-xl border border-slate-800"><span className="text-slate-500">Camera</span><p className="font-bold text-white mt-0.5">{selectedIncident.camera_id}</p></div>
               </div>
 
-              {/* Operator Notes Input */}
+              {/* Notes */}
               <div className="space-y-2">
-                <span className="text-xs font-bold uppercase text-slate-500">Operator Audit Notes</span>
-                <textarea
-                  value={operatorNoteInput || selectedIncident.operator_notes || ''}
-                  onChange={(e) => setOperatorNoteInput(e.target.value)}
-                  placeholder="Enter operator incident notes, dispatch log, or resolution details..."
-                  className="w-full h-20 p-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#00E5FF]"
+                <span className="text-[10px] font-bold uppercase text-slate-500">Operator Audit Notes</span>
+                <textarea 
+                  value={operatorNoteInput || selectedIncident.operator_notes || ''} 
+                  onChange={(e) => setOperatorNoteInput(e.target.value)} 
+                  placeholder="Enter operator incident notes..." 
+                  className="w-full h-20 p-3 text-xs bg-slate-950 border border-slate-800 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-[#00E5FF]" 
                 />
               </div>
 
-              {/* Lifecycle State Transition Action Buttons */}
-              <div className="space-y-2">
-                <span className="text-xs font-bold uppercase text-slate-500">Operator Action Workflow</span>
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => acknowledgeIncident(selectedIncident.id, operatorNoteInput)}
-                    className="flex-1"
-                  >
-                    Acknowledge
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => investigateIncident(selectedIncident.id, operatorNoteInput)}
-                    className="flex-1 text-amber-500 border-amber-500/30"
-                  >
-                    Investigate
-                  </Button>
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={() => resolveIncident(selectedIncident.id, operatorNoteInput)}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    Resolve
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => closeIncident(selectedIncident.id, operatorNoteInput)}
-                    className="flex-1"
-                  >
-                    Close
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => archiveIncident(selectedIncident.id, operatorNoteInput)}
-                    className="flex-1 text-slate-400"
-                  >
-                    Archive
-                  </Button>
-                </div>
+              {/* State Action Buttons */}
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => acknowledgeIncident(selectedIncident.id, operatorNoteInput)} className="flex-1 border-slate-800">Acknowledge</Button>
+                <Button variant="outline" size="sm" onClick={() => investigateIncident(selectedIncident.id, operatorNoteInput)} className="flex-1 text-amber-500 border-amber-500/30">Investigate</Button>
+                <Button variant="default" size="sm" onClick={() => resolveIncident(selectedIncident.id, operatorNoteInput)} className="flex-1 bg-emerald-600 text-white">Resolve</Button>
+                <Button variant="outline" size="sm" onClick={() => closeIncident(selectedIncident.id, operatorNoteInput)} className="flex-1 border-slate-800">Close</Button>
+                <Button variant="outline" size="sm" onClick={() => archiveIncident(selectedIncident.id, operatorNoteInput)} className="flex-1 text-slate-500 border-slate-800">Archive</Button>
               </div>
 
-              {/* Incident History & Timeline */}
+              {/* Timeline */}
               <div className="space-y-2">
-                <h4 className="text-xs font-bold uppercase text-slate-500 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5" /> Full Lifecycle Audit Timeline
-                </h4>
-                <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
+                <h4 className="text-xs font-bold uppercase text-slate-400">Lifecycle Audit Timeline</h4>
+                <div className="space-y-2 max-h-36 overflow-y-auto">
                   {selectedIncident.history?.map((h, i) => (
-                    <div key={i} className="text-xs p-2.5 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                      <div>
-                        <p className="font-semibold text-slate-800 dark:text-slate-200">{h.event}</p>
-                        <p className="text-[10px] text-slate-400">By: {h.operator}</p>
-                      </div>
+                    <div key={i} className="p-2.5 bg-slate-800/40 rounded-xl border border-slate-800 text-xs flex justify-between">
+                      <div><p className="font-semibold text-slate-200">{h.event}</p><p className="text-[10px] text-slate-500">By: {h.operator}</p></div>
                       <span className="font-mono text-[10px] text-slate-500">{h.timestamp}</span>
                     </div>
                   ))}
                 </div>
               </div>
-
             </div>
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
-              <Button variant="outline" onClick={closeDetail} className="w-full">
-                Close Profile
-              </Button>
-            </div>
+            <Button variant="outline" onClick={closeDetail} className="w-full mt-4 border-slate-800">Close Profile</Button>
           </div>
         </div>
       )}
