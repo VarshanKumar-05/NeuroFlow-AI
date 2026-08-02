@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple
 class ANPRSessionManager:
     """
     In-Memory Backend Session Manager for Vehicle Intelligence (v5.0 & v5.1).
-    Acts as the Single Source of Truth for live vehicle monitoring session data.
+    Single Source of Truth for live vehicle monitoring session data.
     0 PostgreSQL database writes; session resets completely on clear or server restart.
     """
     def __init__(self):
@@ -66,8 +66,8 @@ class ANPRSessionManager:
         track_id: int, 
         vehicle_type: str, 
         bbox: List[int], 
-        raw_ocr: str = "AP39AB1234", 
-        ocr_conf: float = 98.4,
+        raw_ocr: Optional[str] = None, 
+        ocr_conf: float = 0.0,
         camera_id: str = "Live City Camera 01"
     ) -> Dict:
         now_str = time.strftime("%H:%M:%S")
@@ -85,9 +85,9 @@ class ANPRSessionManager:
         plate_y2 = min(y2, int(y1 + (y2 - y1) * 0.95))
         plate_crop = frame[plate_y1:plate_y2, x1:x2] if (plate_y2 > plate_y1 and x2 > x1) else veh_crop
         
-        # Validate OCR & lookup cache
+        # Validate OCR & lookup cache (NO HARDCODED PLACEHOLDERS)
         cached = self.ocr_cache.get(track_key)
-        valid_plate = self.validate_and_normalize_plate(raw_ocr, ocr_conf)
+        valid_plate = self.validate_and_normalize_plate(raw_ocr or "", ocr_conf)
         
         if cached:
             if valid_plate and ocr_conf > cached["ocr_confidence"] + 10.0:
@@ -106,8 +106,12 @@ class ANPRSessionManager:
                 plate_crop = cached.get("plate_crop", plate_crop)
                 plate_b64 = cached.get("plate_b64", self._crop_to_base64(plate_crop))
         else:
-            plate = valid_plate or "AP39AB1234"
-            conf = round(ocr_conf, 1) if valid_plate else 98.4
+            if valid_plate:
+                plate = valid_plate
+                conf = round(ocr_conf, 1)
+            else:
+                plate = "Reading Plate..."
+                conf = 0.0
             plate_b64 = self._crop_to_base64(plate_crop)
             self.ocr_cache[track_key] = {
                 "license_plate": plate, 
@@ -120,6 +124,7 @@ class ANPRSessionManager:
         if cached and "veh_b64" not in cached:
             cached["veh_b64"] = veh_b64
 
+        # Strictly ONE record per track_id
         if track_key not in self.tracks:
             first_seen_ts = time.time()
             self.tracks[track_key] = {
@@ -158,10 +163,7 @@ class ANPRSessionManager:
                 
         return self.tracks[track_key]
 
-    def get_track_data(self, track_id: int) -> Optional[Dict]:
-        return self.tracks.get(f"TRK-{track_id}")
-
-    def mark_left_cameras(self, active_track_ids: List[int], timeout_sec: float = 5.0):
+    def mark_left_cameras(self, active_track_ids: List[int], timeout_sec: float = 4.0):
         now = time.time()
         active_keys = {f"TRK-{tid}" for tid in active_track_ids}
         for k, v in self.tracks.items():
@@ -173,7 +175,6 @@ class ANPRSessionManager:
         session_elapsed = max(1, int(now - self.start_time))
         dur_str = f"{session_elapsed // 60}m {session_elapsed % 60}s" if session_elapsed >= 60 else f"{session_elapsed}s"
         
-        # Omit raw numpy arrays for clean JSON serialization
         vehicles_list = []
         for v in self.tracks.values():
             clean_v = {k: val for k, val in v.items() if k != "plate_crop_bgr"}
@@ -181,14 +182,17 @@ class ANPRSessionManager:
             
         vehicles_list.sort(key=lambda x: x.get("last_seen_ts", 0), reverse=True)
         
-        unique_plates = len({v["license_plate"] for v in vehicles_list if v["license_plate"]})
+        # Count unique VALIDATED plates only
+        valid_plates = {v["license_plate"] for v in vehicles_list if v["license_plate"] and v["license_plate"] != "Reading Plate..."}
+        unique_plates = len(valid_plates)
+        
         car_cnt = len([v for v in vehicles_list if v["vehicle_type"].lower() == "car"])
         truck_cnt = len([v for v in vehicles_list if v["vehicle_type"].lower() == "truck"])
         bus_cnt = len([v for v in vehicles_list if v["vehicle_type"].lower() == "bus"])
         bike_cnt = len([v for v in vehicles_list if v["vehicle_type"].lower() in ["motorcycle", "bike"]])
         
         conf_list = [v["ocr_confidence"] for v in vehicles_list if v["ocr_confidence"] > 0]
-        avg_conf = round(sum(conf_list) / len(conf_list), 1) if conf_list else 98.4
+        avg_conf = round(sum(conf_list) / len(conf_list), 1) if conf_list else 0.0
         
         return {
             "session_id": self.session_id,

@@ -14,7 +14,7 @@ class DetectionEngine:
     """
     Unified Computer Vision Engine.
     Runs a single instance of YOLO and ByteTrack in a background thread.
-    Publishes the latest processed frame and delegates analytics to the centralized AnalyticsEngine.
+    Publishes raw & annotated frames with channel-aware overlay rendering.
     """
     def __init__(self, model_path: str = "yolo11n.pt"):
         self.model_path = model_path
@@ -38,11 +38,12 @@ class DetectionEngine:
         self.lock = threading.Lock()
         
         # Shared data
-        self.latest_annotated_frame = None
+        self.latest_raw_frame = None
+        self.latest_stabilized_objects = []
         self.inference_fps = 0
         self.streaming_fps = 0
         self.needs_reset = False
-        self.debug_mode = False # Set to False in production
+        self.debug_mode = False
 
         # Warmup
         dummy = np.zeros((640, 640, 3), dtype=np.uint8)
@@ -68,24 +69,29 @@ class DetectionEngine:
     def reset(self):
         with self.lock:
             self.needs_reset = True
-            self.latest_annotated_frame = None
+            self.latest_raw_frame = None
+            self.latest_stabilized_objects = []
             self.analytics.reset()
 
-    async def stream_video(self):
+    async def stream_video(self, channel: str = "dashboard"):
         """
         Asynchronous MJPEG Stream Generator for FastAPI.
-        Yields non-blocking frames with low latency for the dashboard.
+        Yields non-blocking frames rendered strictly according to the channel specification.
         """
         last_frame_ref = None
         loop = asyncio.get_event_loop()
         import concurrent.futures
         pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         
-        def encode_frame(f):
+        def encode_frame(raw_f, objs):
+            if raw_f is None:
+                return None
+            f = raw_f.copy()
+            rendered = self._render_overlay(f, objs, channel=channel)
             encode_w, encode_h = 1280, 720
-            if f.shape[1] > encode_w:
-                f = cv2.resize(f, (encode_w, encode_h))
-            ret, buffer = cv2.imencode('.jpg', f, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+            if rendered.shape[1] > encode_w:
+                rendered = cv2.resize(rendered, (encode_w, encode_h))
+            ret, buffer = cv2.imencode('.jpg', rendered, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             if ret:
                 return buffer.tobytes()
             return None
@@ -95,9 +101,9 @@ class DetectionEngine:
 
         while True:
             with self.lock:
-                frame_arr = self.latest_annotated_frame
+                frame_arr = self.latest_raw_frame
+                objs = list(self.latest_stabilized_objects) if self.latest_stabilized_objects else []
             
-            # Use id() to ensure we only process genuinely new frames, dropping stales
             current_ref = id(frame_arr)
             if frame_arr is None or current_ref == last_frame_ref:
                 await asyncio.sleep(0.016) # 60Hz polling
@@ -105,8 +111,7 @@ class DetectionEngine:
                 
             last_frame_ref = current_ref
             
-            # Asynchronously encode outside the YOLO loop and outside the main AsyncIO event loop!
-            jpg_bytes = await loop.run_in_executor(pool, encode_frame, frame_arr)
+            jpg_bytes = await loop.run_in_executor(pool, encode_frame, frame_arr, objs)
             
             if jpg_bytes:
                 stream_frames += 1
@@ -123,10 +128,10 @@ class DetectionEngine:
                    
     def _get_class_color(self, cls_id):
         colors = {
-            2: (255, 229, 0),    # Car: Cyan-ish -> BGR: (255, 229, 0) Wait, RGB Cyan is (0,229,255). BGR: (255, 229, 0)
-            3: (129, 185, 16),   # Motorcycle/Bike: Green -> BGR: (129, 185, 16)
-            5: (246, 130, 59),   # Bus: Blue -> BGR: (246, 130, 59)
-            7: (11, 158, 245)    # Truck: Amber -> BGR: (11, 158, 245)
+            2: (0, 229, 255),    # Car: Cyan
+            3: (129, 185, 16),   # Motorcycle/Bike: Green
+            5: (246, 130, 59),   # Bus: Blue
+            7: (11, 158, 245)    # Truck: Amber
         }
         return colors.get(cls_id, (255, 255, 255))
         
@@ -134,23 +139,19 @@ class DetectionEngine:
         names = {2: "CAR", 3: "BIKE", 5: "BUS", 7: "TRUCK"}
         return names.get(cls_id, "VEH")
 
-    def _render_overlay(self, frame, stabilized_objects):
+    def _render_overlay(self, frame, stabilized_objects, channel: str = "dashboard"):
         height, width = frame.shape[:2]
         
         if self.debug_mode:
             line_y = int(height * self.analytics.counter.roi_line_y_ratio)
             cv2.line(frame, (0, line_y), (width, line_y), (0, 0, 255), 2)
         
-        if stabilized_objects:
-            from app.services.session_manager import anpr_session_manager
-            active_ids = [obj["track_id"] for obj in stabilized_objects]
-            anpr_session_manager.mark_left_cameras(active_ids)
-            
-            # Sort objects by Y coordinate to handle vertical overlap offset adjustments
-            sorted_objs = sorted(stabilized_objects, key=lambda o: o["bbox"][1])
-            placed_previews = []
+        if not stabilized_objects:
+            return frame
 
-            for obj in sorted_objs:
+        # STRICT MODULE BOUNDARY: Live Vision / Dashboard / Incidents display ONLY standard YOLO bounding boxes
+        if channel != "vehicles":
+            for obj in stabilized_objects:
                 x1, y1, x2, y2 = map(int, obj["bbox"])
                 orig_id = obj["track_id"]
                 cls_id = obj["class_id"]
@@ -158,69 +159,97 @@ class DetectionEngine:
                 color = self._get_class_color(cls_id)
                 name = self._get_class_name(cls_id)
                 
-                # Update/fetch track session data from ANPRSessionManager
-                session_rec = anpr_session_manager.process_vehicle_track(
-                    frame=frame,
-                    track_id=orig_id,
-                    vehicle_type=name,
-                    bbox=[x1, y1, x2, y2]
-                )
+                # Standard clean bounding box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2, cv2.LINE_AA)
                 
-                plate_text = session_rec["license_plate"]
-                ocr_conf = session_rec["ocr_confidence"]
-                plate_crop_bgr = session_rec.get("plate_crop_bgr")
-                
-                # 1. Draw Vehicle Bounding Box (2px thick)
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 229, 255), 2, cv2.LINE_AA)
-                
-                # 2. Vehicle Class Tag below plate box
-                tag_label = f"{name}"
-                cv2.putText(frame, tag_label, (x1 + 4, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 229, 255), 1, cv2.LINE_AA)
-                
-                # 3. Calculate Floating Plate Preview Box position with Overlap Prevention
-                box_w, box_h = 160, 50
-                target_y = y1 - 65
-                target_x = max(5, min(width - box_w - 5, x1))
-                
-                # Adjust target_y if overlapping with an already placed preview box
-                for prev_x, prev_y in placed_previews:
-                    if abs(target_x - prev_x) < 140 and abs(target_y - prev_y) < 45:
-                        target_y -= 45 # Shift upward to prevent text/crop overlap
-                        
-                target_y = max(5, target_y)
-                placed_previews.append((target_x, target_y))
+                # Clean vehicle class tag
+                label = f"{name} #{orig_id}"
+                (w, h), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+                cv2.rectangle(frame, (x1, y1 - h - 8), (x1 + w + 6, y1), color, -1, cv2.LINE_AA)
+                cv2.putText(frame, label, (x1 + 3, y1 - 4), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 0, 0), 1, cv2.LINE_AA)
+            return frame
 
-                # 4. Outer Floating Plate Container (Dark semi-transparent background + Green border)
-                sub_y2 = min(height, target_y + box_h)
-                sub_x2 = min(width, target_x + box_w)
+        # VEHICLE INTELLIGENCE CHANNEL: Full ANPR Floating Plate Crop Previews
+        from app.services.session_manager import anpr_session_manager
+        active_ids = [obj["track_id"] for obj in stabilized_objects]
+        anpr_session_manager.mark_left_cameras(active_ids)
+        
+        sorted_objs = sorted(stabilized_objects, key=lambda o: o["bbox"][1])
+        placed_previews = []
+
+        for obj in sorted_objs:
+            x1, y1, x2, y2 = map(int, obj["bbox"])
+            orig_id = obj["track_id"]
+            cls_id = obj["class_id"]
+            
+            name = self._get_class_name(cls_id)
+            
+            # Update/fetch track session data from ANPRSessionManager (NO HARDCODED PLACEHOLDERS)
+            session_rec = anpr_session_manager.process_vehicle_track(
+                frame=frame,
+                track_id=orig_id,
+                vehicle_type=name,
+                bbox=[x1, y1, x2, y2]
+            )
+            
+            plate_text = session_rec["license_plate"]
+            ocr_conf = session_rec["ocr_confidence"]
+            plate_crop_bgr = session_rec.get("plate_crop_bgr")
+            
+            # 1. Draw Vehicle Bounding Box (2px thick green/cyan)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 229, 255), 2, cv2.LINE_AA)
+            
+            # 2. Vehicle Class Tag below box
+            cv2.putText(frame, name, (x1 + 4, y1 - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 229, 255), 1, cv2.LINE_AA)
+            
+            # 3. Calculate Floating Plate Preview Box position with Overlap Prevention
+            box_w, box_h = 165, 52
+            target_y = y1 - 65
+            target_x = max(5, min(width - box_w - 5, x1))
+            
+            for prev_x, prev_y in placed_previews:
+                if abs(target_x - prev_x) < 140 and abs(target_y - prev_y) < 45:
+                    target_y -= 45
+                    
+            target_y = max(5, target_y)
+            placed_previews.append((target_x, target_y))
+
+            # 4. Outer Floating Plate Container Box
+            sub_y2 = min(height, target_y + box_h)
+            sub_x2 = min(width, target_x + box_w)
+            
+            if target_y < height and target_x < width and sub_y2 > target_y and sub_x2 > target_x:
+                overlay_roi = frame[target_y:sub_y2, target_x:sub_x2]
+                dark_bg = np.zeros_like(overlay_roi)
+                cv2.addWeighted(overlay_roi, 0.25, dark_bg, 0.75, 0, overlay_roi)
                 
-                if target_y < height and target_x < width and sub_y2 > target_y and sub_x2 > target_x:
-                    overlay_roi = frame[target_y:sub_y2, target_x:sub_x2]
-                    dark_bg = np.zeros_like(overlay_roi)
-                    cv2.addWeighted(overlay_roi, 0.25, dark_bg, 0.75, 0, overlay_roi)
-                    
-                    # Draw Container Border
-                    cv2.rectangle(frame, (target_x, target_y), (target_x + box_w, target_y + box_h), (52, 211, 153), 1, cv2.LINE_AA)
-                    
-                    # 5. Insert Resized Plate Crop Image inside container
-                    if plate_crop_bgr is not None and plate_crop_bgr.size > 0:
-                        try:
-                            resized_crop = cv2.resize(plate_crop_bgr, (70, 26))
-                            crop_h, crop_w = resized_crop.shape[:2]
-                            c_y1, c_x1 = target_y + 4, target_x + 4
-                            c_y2, c_x2 = c_y1 + crop_h, c_x1 + crop_w
-                            if c_y2 <= height and c_x2 <= width:
-                                frame[c_y1:c_y2, c_x1:c_x2] = resized_crop
-                                cv2.rectangle(frame, (c_x1, c_y1), (c_x2, c_y2), (255, 255, 255), 1)
-                        except Exception:
-                            pass
-                            
-                    # 6. Render Plate Text & Confidence Badge
-                    plate_str = f"{plate_text}"
-                    conf_str = f"{ocr_conf}%"
-                    cv2.putText(frame, plate_str, (target_x + 80, target_y + 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 255), 1, cv2.LINE_AA)
-                    cv2.putText(frame, conf_str, (target_x + 80, target_y + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (52, 211, 153), 1, cv2.LINE_AA)
-                    
+                # Green border for validated plate, amber for "Reading Plate..."
+                border_color = (52, 211, 153) if plate_text != "Reading Plate..." else (0, 165, 255)
+                cv2.rectangle(frame, (target_x, target_y), (target_x + box_w, target_y + box_h), border_color, 1, cv2.LINE_AA)
+                
+                # 5. Insert Resized Plate Crop Image inside container
+                if plate_crop_bgr is not None and plate_crop_bgr.size > 0:
+                    try:
+                        resized_crop = cv2.resize(plate_crop_bgr, (70, 28))
+                        crop_h, crop_w = resized_crop.shape[:2]
+                        c_y1, c_x1 = target_y + 4, target_x + 4
+                        c_y2, c_x2 = c_y1 + crop_h, c_x1 + crop_w
+                        if c_y2 <= height and c_x2 <= width:
+                            frame[c_y1:c_y2, c_x1:c_x2] = resized_crop
+                            cv2.rectangle(frame, (c_x1, c_y1), (c_x2, c_y2), (255, 255, 255), 1)
+                    except Exception:
+                        pass
+                        
+                # 6. Render Plate Text & Confidence Badge (NO HARDCODED VALUES)
+                plate_str = f"{plate_text}"
+                conf_str = f"{ocr_conf}%" if ocr_conf > 0 else "SCANNING"
+                
+                font_scale = 0.4 if plate_text == "Reading Plate..." else 0.45
+                text_color = (0, 255, 255) if plate_text != "Reading Plate..." else (200, 200, 200)
+                
+                cv2.putText(frame, plate_str, (target_x + 78, target_y + 18), cv2.FONT_HERSHEY_SIMPLEX, font_scale, text_color, 1, cv2.LINE_AA)
+                cv2.putText(frame, conf_str, (target_x + 78, target_y + 36), cv2.FONT_HERSHEY_SIMPLEX, 0.4, border_color, 1, cv2.LINE_AA)
+                
         return frame
 
     def _run_loop(self):
@@ -267,13 +296,8 @@ class DetectionEngine:
                         inference_fps=self.inference_fps,
                         streaming_fps=self.streaming_fps
                     )
-                
-                # Render using zero-copy input (frame is mutated directly)
-                annotated_frame = self._render_overlay(frame, stabilized_objects)
-                
-                with self.lock:
-                    # Store a fast copy of the annotated numpy array to completely free the inference loop
-                    self.latest_annotated_frame = annotated_frame.copy()
+                    self.latest_raw_frame = frame.copy()
+                    self.latest_stabilized_objects = stabilized_objects
                         
                 frame_count += 1
                 elapsed = time.time() - start_time
