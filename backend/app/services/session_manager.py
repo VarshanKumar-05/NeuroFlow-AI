@@ -5,10 +5,11 @@ import base64
 import numpy as np
 import logging
 from typing import Dict, List, Optional, Tuple
+from app.services.anpr_engine import anpr_engine
 
 class ANPRSessionManager:
     """
-    In-Memory Backend Session Manager for Vehicle Intelligence (v5.0 & v5.1).
+    In-Memory Backend Session Manager for Vehicle Intelligence (v5.0, v5.1 & v5.2).
     Single Source of Truth for live vehicle monitoring session data.
     0 PostgreSQL database writes; session resets completely on clear or server restart.
     """
@@ -25,34 +26,11 @@ class ANPRSessionManager:
         self.ocr_cache.clear()
         return {"status": "cleared", "session_id": self.session_id}
 
-    def validate_and_normalize_plate(self, raw_ocr: str, conf: float) -> Optional[str]:
-        if not raw_ocr or conf < 55.0:
-            return None
-            
-        clean = re.sub(r'[^A-Z0-9]', '', raw_ocr.upper())
-        if len(clean) < 4 or len(clean) > 12:
-            return None
-            
-        # Character disambiguation / normalization (e.g. AP39AB1234 format)
-        normalized = clean
-        if len(normalized) >= 8:
-            prefix = normalized[:2]
-            suffix = normalized[-4:]
-            middle = normalized[2:-4]
-            
-            # Normalize state prefix letters (e.g. 0P -> OP, A1 -> AI)
-            prefix = prefix.replace('0', 'O').replace('1', 'I')
-            # Normalize numeric suffix digits (e.g. O -> 0, I -> 1)
-            suffix = suffix.replace('O', '0').replace('I', '1').replace('Z', '2')
-            normalized = f"{prefix}{middle}{suffix}"
-            
-        return normalized
-
     def _crop_to_base64(self, crop_bgr: np.ndarray) -> str:
         try:
             if crop_bgr is None or crop_bgr.size == 0:
                 return "/static/snapshots/placeholder.jpg"
-            ret, buffer = cv2.imencode('.jpg', crop_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+            ret, buffer = cv2.imencode('.jpg', crop_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
             if ret:
                 b64 = base64.b64encode(buffer).decode('utf-8')
                 return f"data:image/jpeg;base64,{b64}"
@@ -65,66 +43,42 @@ class ANPRSessionManager:
         frame: np.ndarray, 
         track_id: int, 
         vehicle_type: str, 
-        bbox: List[int], 
-        raw_ocr: Optional[str] = None, 
-        ocr_conf: float = 0.0,
+        bbox: List[int],
         camera_id: str = "Live City Camera 01"
     ) -> Dict:
         now_str = time.strftime("%H:%M:%S")
         track_key = f"TRK-{track_id}"
-        x1, y1, x2, y2 = map(int, bbox)
-        h, w = frame.shape[:2]
         
-        # Clamp bounding box coordinates
-        x1, y1 = max(0, x1), max(0, y1)
-        x2, y2 = min(w, x2), min(h, y2)
+        # 1. Dedicated Plate ROI Crop & Vehicle Crop Extraction
+        veh_crop, plate_crop = anpr_engine.detect_plate_roi(frame, bbox)
         
-        # Vehicle Crop & Plate ROI Crop
-        veh_crop = frame[y1:y2, x1:x2] if (y2 > y1 and x2 > x1) else None
-        plate_y1 = int(y1 + (y2 - y1) * 0.55)
-        plate_y2 = min(y2, int(y1 + (y2 - y1) * 0.95))
-        plate_crop = frame[plate_y1:plate_y2, x1:x2] if (plate_y2 > plate_y1 and x2 > x1) else veh_crop
-        
-        # Validate OCR & lookup cache (NO HARDCODED PLACEHOLDERS)
+        # 2. Check OCR Cache
         cached = self.ocr_cache.get(track_key)
-        valid_plate = self.validate_and_normalize_plate(raw_ocr or "", ocr_conf)
         
-        if cached:
-            if valid_plate and ocr_conf > cached["ocr_confidence"] + 10.0:
-                plate = valid_plate
-                conf = round(ocr_conf, 1)
-                plate_b64 = self._crop_to_base64(plate_crop)
-                self.ocr_cache[track_key] = {
-                    "license_plate": plate, 
-                    "ocr_confidence": conf, 
-                    "plate_crop": plate_crop,
-                    "plate_b64": plate_b64
-                }
-            else:
-                plate = cached["license_plate"]
-                conf = cached["ocr_confidence"]
-                plate_crop = cached.get("plate_crop", plate_crop)
-                plate_b64 = cached.get("plate_b64", self._crop_to_base64(plate_crop))
+        if cached and cached.get("license_plate") != "Reading Plate...":
+            plate = cached["license_plate"]
+            conf = cached["ocr_confidence"]
+            plate_crop = cached.get("plate_crop_bgr", plate_crop)
+            plate_b64 = cached.get("plate_b64")
+            veh_b64 = cached.get("veh_b64")
         else:
-            if valid_plate:
-                plate = valid_plate
-                conf = round(ocr_conf, 1)
-            else:
-                plate = "Reading Plate..."
-                conf = 0.0
-            plate_b64 = self._crop_to_base64(plate_crop)
-            self.ocr_cache[track_key] = {
-                "license_plate": plate, 
-                "ocr_confidence": conf, 
-                "plate_crop": plate_crop,
-                "plate_b64": plate_b64
-            }
+            # 3. Perform Real OCR on cropped plate ROI
+            ocr_text, ocr_conf = anpr_engine.perform_ocr(plate_crop)
+            plate = ocr_text
+            conf = ocr_conf
             
-        veh_b64 = self._crop_to_base64(veh_crop) if (cached is None or "veh_b64" not in cached) else cached.get("veh_b64", self._crop_to_base64(veh_crop))
-        if cached and "veh_b64" not in cached:
-            cached["veh_b64"] = veh_b64
+            plate_b64 = self._crop_to_base64(plate_crop)
+            veh_b64 = self._crop_to_base64(veh_crop)
+            
+            self.ocr_cache[track_key] = {
+                "license_plate": plate,
+                "ocr_confidence": conf,
+                "plate_crop_bgr": plate_crop,
+                "plate_b64": plate_b64,
+                "veh_b64": veh_b64
+            }
 
-        # Strictly ONE record per track_id
+        # 4. Maintain Strictly ONE record per track_id
         if track_key not in self.tracks:
             first_seen_ts = time.time()
             self.tracks[track_key] = {
