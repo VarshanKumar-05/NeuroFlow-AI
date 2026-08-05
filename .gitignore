@@ -56,6 +56,18 @@ frontend/.vite/
 node_modules/
 dist/
 
+# Large Media & Video Files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.flv
+backend/*.mp4
+frontend/public/*.mp4
+Dataset_annotated.mp4
+Dataset.mp4
+
 # Logs
 *.log
 logs/
