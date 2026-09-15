@@ -187,7 +187,7 @@ export default function Vehicles() {
                   <h3 className="text-sm font-black uppercase tracking-wider text-white">Live Vehicle Intelligence</h3>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                  1 RECORD / TRACK
+                  {vehicles.length} RECORD{vehicles.length === 1 ? '' : 'S'} / TRACK
                 </span>
               </div>
 

@@ -299,6 +299,25 @@ class DetectionEngine:
                 
                 result = results[0] if len(results) > 0 else None
                 stabilized_objects = state_manager.update(result)
+
+                if stabilized_objects:
+                    try:
+                        from app.services.session_manager import anpr_session_manager
+                        active_ids = [obj["track_id"] for obj in stabilized_objects]
+                        anpr_session_manager.mark_left_cameras(active_ids)
+                        for obj in stabilized_objects:
+                            x1, y1, x2, y2 = map(int, obj["bbox"])
+                            orig_id = obj["track_id"]
+                            cls_id = obj["class_id"]
+                            name = self._get_class_name(cls_id)
+                            anpr_session_manager.process_vehicle_track(
+                                frame=frame,
+                                track_id=orig_id,
+                                vehicle_type=name,
+                                bbox=[x1, y1, x2, y2]
+                            )
+                    except Exception as e:
+                        logging.error(f"[Engine] ANPR feed error in run_loop: {e}")
                 
                 with self.lock:
                     self.analytics.process_frame(
