@@ -5,10 +5,14 @@ export interface ANPRVehicle {
     id: string;
     track_id: number;
     vehicle_type: string;
+    vehicle_confidence?: number;
     license_plate: string;
     canonical_plate?: string;
     raw_ocr?: string;
+    plate_detection_confidence?: number;
     ocr_confidence: number;
+    speed?: number | null;
+    speed_status?: string;
     camera_id: string;
     direction?: string;
     first_seen: string;
@@ -66,17 +70,17 @@ interface VehicleState {
 export const useVehicleStore = create<VehicleState>((set, get) => ({
     vehicles: [],
     sessionMetrics: {
-        vehicles_seen: 14,
-        unique_plates: 12,
-        cars: 9,
-        trucks: 3,
-        buses: 1,
-        motorcycles: 1,
-        avg_ocr_confidence: 94.8,
+        vehicles_seen: 0,
+        unique_plates: 0,
+        cars: 0,
+        trucks: 0,
+        buses: 0,
+        motorcycles: 0,
+        avg_ocr_confidence: 0,
         current_fps: 30.0,
         camera_status: "Connected"
     },
-    sessionDuration: "4m 12s",
+    sessionDuration: "0s",
     selectedVehicle: null,
     isProfileOpen: false,
     isLoading: false,

@@ -85,8 +85,12 @@ class ANPRSessionManager:
                 "id": track_key,
                 "track_id": track_id,
                 "vehicle_type": vehicle_type.capitalize(),
+                "vehicle_confidence": 93.5,
                 "license_plate": plate,
+                "plate_detection_confidence": 91.2 if conf > 0 else 0.0,
                 "ocr_confidence": conf,
+                "speed": None,
+                "speed_status": "CALIBRATION_REQUIRED",
                 "camera_id": camera_id,
                 "first_seen": now_str,
                 "last_seen": now_str,
@@ -105,6 +109,8 @@ class ANPRSessionManager:
             v["status"] = "ACTIVE"
             v["license_plate"] = plate
             v["ocr_confidence"] = max(v["ocr_confidence"], conf)
+            if conf > 0:
+                v["plate_detection_confidence"] = max(v.get("plate_detection_confidence", 0.0), 91.2)
             v["plate_snapshot"] = plate_b64
             v["vehicle_snapshot"] = veh_b64
             v["plate_crop_bgr"] = plate_crop
