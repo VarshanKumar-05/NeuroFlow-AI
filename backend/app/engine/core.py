@@ -149,6 +149,23 @@ class DetectionEngine:
         if not stabilized_objects:
             return frame
 
+        # Feed Model 1 tracked vehicle ROIs to Model 2 (ANPRSessionManager)
+        from app.services.session_manager import anpr_session_manager
+        active_ids = [obj["track_id"] for obj in stabilized_objects]
+        anpr_session_manager.mark_left_cameras(active_ids)
+
+        for obj in stabilized_objects:
+            x1, y1, x2, y2 = map(int, obj["bbox"])
+            orig_id = obj["track_id"]
+            cls_id = obj["class_id"]
+            name = self._get_class_name(cls_id)
+            anpr_session_manager.process_vehicle_track(
+                frame=frame,
+                track_id=orig_id,
+                vehicle_type=name,
+                bbox=[x1, y1, x2, y2]
+            )
+
         # STRICT MODULE BOUNDARY: Live Vision / Dashboard / Incidents display ONLY standard YOLO bounding boxes
         if channel != "vehicles":
             for obj in stabilized_objects:
@@ -170,10 +187,6 @@ class DetectionEngine:
             return frame
 
         # VEHICLE INTELLIGENCE CHANNEL: Full ANPR Floating Plate Crop Previews
-        from app.services.session_manager import anpr_session_manager
-        active_ids = [obj["track_id"] for obj in stabilized_objects]
-        anpr_session_manager.mark_left_cameras(active_ids)
-        
         sorted_objs = sorted(stabilized_objects, key=lambda o: o["bbox"][1])
         placed_previews = []
 
@@ -181,10 +194,9 @@ class DetectionEngine:
             x1, y1, x2, y2 = map(int, obj["bbox"])
             orig_id = obj["track_id"]
             cls_id = obj["class_id"]
-            
             name = self._get_class_name(cls_id)
             
-            # Update/fetch track session data from ANPRSessionManager (NO HARDCODED PLACEHOLDERS)
+            # Fetch track session data from ANPRSessionManager
             session_rec = anpr_session_manager.process_vehicle_track(
                 frame=frame,
                 track_id=orig_id,
