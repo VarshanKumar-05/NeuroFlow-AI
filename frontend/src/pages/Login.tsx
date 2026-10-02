@@ -65,35 +65,29 @@ export default function Login() {
             {/* Outer Container mimicking premium SaaS layout */}
             <div className="w-full h-full max-w-[1800px] mx-auto flex flex-col lg:flex-row bg-white rounded-[28px] shadow-[0_30px_80px_rgba(15,23,42,0.10)] overflow-hidden border border-[#E2E8F0] relative">
                 
-                {/* LEFT SECTION - VIDEO HERO (65% width) */}
-                <div className="relative hidden lg:flex lg:w-[65%] flex-col justify-between p-12 z-0 overflow-hidden">
+                {/* LEFT SECTION - VIDEO HERO (60% width) */}
+                <div className="relative hidden lg:flex lg:w-[60%] flex-col justify-between p-10 2xl:p-12 z-0 overflow-hidden bg-slate-950">
                     
                     {/* Background Video */}
-                    <div className="absolute inset-0 z-[-2]">
+                    <div className="absolute inset-0 z-0">
                         <video 
-                            src="/videos/login-bg.mp4"
                             autoPlay 
                             loop 
                             muted 
                             playsInline
                             preload="auto"
-                            className="w-full h-full object-cover"
-                        />
+                            className="w-full h-full object-cover opacity-90"
+                        >
+                            <source src="/videos/login-bg.mp4" type="video/mp4" />
+                            <source src="/Dataset.mp4" type="video/mp4" />
+                        </video>
                     </div>
 
                     {/* Gradient Overlay for Text Readability */}
                     <div 
-                        className="absolute inset-0 z-[-1]" 
+                        className="absolute inset-0 z-0 pointer-events-none" 
                         style={{
-                            background: 'linear-gradient(90deg, rgba(255,255,255,.88), rgba(255,255,255,.45), rgba(255,255,255,.10))'
-                        }} 
-                    />
-
-                    {/* Gradient Overlay for Text Readability */}
-                    <div 
-                        className="absolute inset-0 z-[-1]" 
-                        style={{
-                            background: 'linear-gradient(90deg, rgba(255,255,255,.70) 0%, rgba(255,255,255,.35) 35%, rgba(255,255,255,.08) 70%, rgba(255,255,255,0) 100%)'
+                            background: 'linear-gradient(90deg, rgba(15,23,42,0.88) 0%, rgba(15,23,42,0.50) 45%, rgba(15,23,42,0.15) 100%)'
                         }} 
                     />
 
