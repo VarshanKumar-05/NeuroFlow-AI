@@ -63,27 +63,15 @@ export default function Login() {
             {/* Outer Container matching exact SaaS design in screenshot */}
             <div className="w-full h-full max-w-[1720px] mx-auto flex flex-col lg:flex-row bg-white rounded-[32px] shadow-[0_25px_70px_rgba(15,23,42,0.08)] overflow-hidden border border-[#E2E8F0] relative">
                 
-                {/* LEFT HERO SECTION (60% width) - 3D Smart City Visual & Video Stream */}
+                {/* LEFT HERO SECTION (60% width) - 3D Smart City Visual */}
                 <div className="relative hidden lg:flex lg:w-[60%] flex-col justify-between p-10 2xl:p-14 z-0 overflow-hidden bg-slate-100">
                     
-                    {/* Background Video with Image Poster Fallback */}
+                    {/* Background Image */}
                     <div className="absolute inset-0 z-0">
-                        <video 
-                            autoPlay 
-                            loop 
-                            muted 
-                            playsInline
-                            preload="auto"
-                            poster="/login-bg.png"
-                            className="w-full h-full object-cover"
-                        >
-                            <source src="/videos/login-bg.mp4" type="video/mp4" />
-                            <source src="/Dataset.mp4" type="video/mp4" />
-                        </video>
                         <img 
                             src="/login-bg.png" 
-                            alt="City Background" 
-                            className="w-full h-full object-cover absolute inset-0 -z-10"
+                            alt="Smart City Background" 
+                            className="w-full h-full object-cover"
                         />
                     </div>
 
